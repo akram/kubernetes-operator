@@ -12,6 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+        "k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -127,6 +128,16 @@ func createJenkinsCR(t *testing.T, name, namespace string, seedJob *[]v1alpha2.S
 							TimeoutSeconds:      int32(4),
 							FailureThreshold:    int32(10),
 						},
+                                                Resources: corev1.ResourceRequirements{
+                                                        Requests: corev1.ResourceList{
+                                                                corev1.ResourceCPU:    resource.MustParse("750m"),
+                                                                corev1.ResourceMemory: resource.MustParse("500Mi"),
+                                                        },
+                                                        Limits: corev1.ResourceList{
+                                                                corev1.ResourceCPU:    resource.MustParse("750m"),
+                                                                corev1.ResourceMemory: resource.MustParse("1Gi"),
+                                                        },
+                                                },
 					},
 					{
 						Name:  "envoyproxy",
@@ -138,7 +149,6 @@ func createJenkinsCR(t *testing.T, name, namespace string, seedJob *[]v1alpha2.S
 					{Name: "simple-theme-plugin", Version: "0.5.1"},
 					{Name: "github", Version: "1.29.4"},
 				},
-				NodeSelector: map[string]string{"kubernetes.io/hostname": "minikube"},
 			},
 			SeedJobs: seedJobs,
 			Service: v1alpha2.Service{

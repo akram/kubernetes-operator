@@ -1,7 +1,8 @@
 package e2e
 
 import (
-	goctx "context"
+	"fmt"
+        goctx "context"
 	"net/http"
 	"testing"
 	"time"
@@ -36,7 +37,7 @@ type checkConditionFunc func(*v1alpha2.Jenkins, error) bool
 
 func waitForJobToFinish(t *testing.T, job *gojenkins.Job, tick, timeout time.Duration) {
 	err := try.Until(func() (end bool, err error) {
-		t.Logf("Waiting for job `%s` to finish", job.GetName())
+		fmt.Printf("Waiting for job `%s` to finish", job.GetName())
 		running, err := job.IsRunning()
 		if err != nil {
 			return false, err
@@ -57,15 +58,18 @@ func waitForJobToFinish(t *testing.T, job *gojenkins.Job, tick, timeout time.Dur
 }
 
 func waitForJenkinsBaseConfigurationToComplete(t *testing.T, jenkins *v1alpha2.Jenkins) {
-	t.Log("Waiting for Jenkins base configuration to complete")
+	fmt.Println("Waiting for Jenkins base configuration to complete")
+        fmt.Printf("Expecting Jenkins to be like %v", jenkins)
 	_, err := WaitUntilJenkinsConditionSet(retryInterval, 150, jenkins, func(jenkins *v1alpha2.Jenkins, err error) bool {
-		t.Logf("Current Jenkins status: '%+v', error '%s'", jenkins.Status, err)
+		fmt.Printf("Current Jenkins status: '%+v', error '%s'", jenkins.Status, err)
+                fmt.Println("")
 		return err == nil && jenkins.Status.BaseConfigurationCompletedTime != nil
 	})
 	if err != nil {
+                fmt.Printf("Fatal error: %v", err)
 		t.Fatal(err)
 	}
-	t.Log("Jenkins pod is running")
+	fmt.Println("AAAAAAAAAAAAAAAAAAAAAAAAAAAA Jenkins pod is running")
 
 	// update jenkins CR because Operator sets default values
 	namespacedName := types.NamespacedName{Namespace: jenkins.Namespace, Name: jenkins.Name}
@@ -91,19 +95,19 @@ func waitForRecreateJenkinsMasterPod(t *testing.T, jenkins *v1alpha2.Jenkins) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Jenkins pod has been recreated")
+	fmt.Println("Jenkins pod has been recreated")
 }
 
 func waitForJenkinsUserConfigurationToComplete(t *testing.T, jenkins *v1alpha2.Jenkins) {
-	t.Log("Waiting for Jenkins user configuration to complete")
+	fmt.Println("Waiting for Jenkins user configuration to complete")
 	_, err := WaitUntilJenkinsConditionSet(retryInterval, 75, jenkins, func(jenkins *v1alpha2.Jenkins, err error) bool {
-		t.Logf("Current Jenkins status: '%+v', error '%s'", jenkins.Status, err)
+		fmt.Printf("Current Jenkins status: '%+v', error '%s'", jenkins.Status, err)
 		return err == nil && jenkins.Status.UserConfigurationCompletedTime != nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log("Jenkins pod is running")
+	fmt.Println("Jenkins pod is running")
 }
 
 func waitForJenkinsSafeRestart(t *testing.T, jenkinsClient jenkinsclient.Jenkins) {

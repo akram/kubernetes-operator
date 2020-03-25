@@ -1,3 +1,4 @@
+out/
 .idea
 /vendor
 deploy/namespace-init.yaml

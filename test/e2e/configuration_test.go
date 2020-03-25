@@ -23,7 +23,8 @@ import (
 )
 
 func TestConfiguration(t *testing.T) {
-	t.Parallel()
+	fmt.Println("Starting TestConfiguration")
+        t.Parallel()
 	namespace, ctx := setupTest(t)
 
 	defer showLogsAndCleanup(t, ctx)
@@ -82,6 +83,7 @@ func TestConfiguration(t *testing.T) {
 	stringData[numberOfExecutorsEnvName] = fmt.Sprintf("%d", numberOfExecutors)
 
 	// base
+        fmt.Println("AAAAAAAAA createUserConfigurationSecret")
 	createUserConfigurationSecret(t, namespace, stringData)
 	createUserConfigurationConfigMap(t, namespace, numberOfExecutorsEnvName, fmt.Sprintf("${%s}", systemMessageEnvName))
 	jenkins := createJenkinsCR(t, jenkinsCRName, namespace, &[]v1alpha2.SeedJob{mySeedJob.SeedJob}, groovyScripts, casc)
@@ -149,7 +151,7 @@ func createUserConfigurationSecret(t *testing.T, namespace string, stringData ma
 		StringData: stringData,
 	}
 
-	t.Logf("User configuration secret %+v", *userConfiguration)
+	//fmt.Println("User configuration secret %+v", *userConfiguration)
 	if err := framework.Global.Client.Create(context.TODO(), userConfiguration, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +179,7 @@ unclassified:
 		},
 	}
 
-	t.Logf("User configuration %+v", *userConfiguration)
+	//fmt.Println("User configuration %+v", *userConfiguration)
 	if err := framework.Global.Client.Create(context.TODO(), userConfiguration, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +208,7 @@ func createDefaultLimitsForContainersInNamespace(t *testing.T, namespace string)
 		},
 	}
 
-	t.Logf("LimitRange %+v", *limitRange)
+	//fmt.Println("LimitRange %+v", *limitRange)
 	if err := framework.Global.Client.Create(context.TODO(), limitRange, nil); err != nil {
 		t.Fatal(err)
 	}

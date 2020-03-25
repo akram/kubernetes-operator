@@ -1,15 +1,13 @@
-# build stage
-FROM golang:1.13.1-alpine3.10 AS build-stage
-ARG OPERATOR_SDK_VERSION=0.10.0
-ENV GO111MODULE=on
-RUN apk --no-cache add git curl make \
-    && curl -L https://github.com/operator-framework/operator-sdk/releases/download/v$OPERATOR_SDK_VERSION/operator-sdk-v$OPERATOR_SDK_VERSION-x86_64-linux-gnu -o /usr/local/bin/operator-sdk \
-    && chmod +x /usr/local/bin/operator-sdk
-ADD . /kubernetes-operator
-RUN cd /kubernetes-operator && make build config=config.in-cluster.env
+FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
 
-# run stage
-FROM golang:1.13.1-alpine3.10 
-RUN apk --no-cache add git bash curl make
-COPY --from=build-stage /kubernetes-operator/build/_output/bin/jenkins-operator /usr/local/bin/jenkins-operator
-CMD [ "/usr/local/bin/jenkins-operator" ]
+ENV OPERATOR=/usr/local/bin/jenkins-operator \
+    USER_UID=1001 \
+    OPERATOR_NAME=jenkins-operator \
+    USER_NAME=jenkins-operator
+
+# install operator binary
+COPY build/_output/bin/$OPERATOR_NAME ${OPERATOR}
+COPY build/bin /usr/local/bin
+RUN  /usr/local/bin/user_setup
+ENTRYPOINT ["/usr/local/bin/entrypoint"]
+USER ${USER_UID}
