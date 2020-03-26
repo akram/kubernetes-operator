@@ -7,7 +7,7 @@ import (
 
 	"github.com/jenkinsci/kubernetes-operator/pkg/apis"
 	"github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2"
-	"github.com/jenkinsci/kubernetes-operator/pkg/controller/jenkins/constants"
+	//"github.com/jenkinsci/kubernetes-operator/pkg/controller/jenkins/constants"
 
 	framework "github.com/operator-framework/operator-sdk/pkg/test"
 	// "github.com/operator-framework/operator-sdk/pkg/test/e2eutil"
@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	jenkinsOperatorDeploymentName     = constants.OperatorName
+	// jenkinsOperatorDeploymentName     = constants.OperatorName
 	seedJobConfigurationParameterName = "seed-job-config"
 )
 

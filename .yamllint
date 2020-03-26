@@ -1,3 +1,9 @@
+extends: default
+
+ignore: |
+  /chart
+
+
 rules:
   braces: enable
   brackets: enable
@@ -32,3 +38,5 @@ rules:
   #                 - item
   indentation:
     indent-sequences: whatever
+
+

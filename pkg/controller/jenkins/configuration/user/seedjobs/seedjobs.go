@@ -251,8 +251,14 @@ func (s *SeedJobs) createJobs(jenkins *v1alpha2.Jenkins) (requeue bool, err erro
 		}
 
 		hash := sha256.New()
-		hash.Write([]byte(groovyScript))
-		hash.Write([]byte(credentialValue))
+                _, err = hash.Write([]byte(groovyScript))
+                if err != nil {
+                        return true, err
+                }
+                _, err = hash.Write([]byte(credentialValue))
+                if err != nil {
+                        return true, err
+                }
 		requeue, err := groovyClient.EnsureSingle(seedJob.ID, fmt.Sprintf("%s.groovy", seedJob.ID), base64.URLEncoding.EncodeToString(hash.Sum(nil)), groovyScript)
 		if err != nil {
 			return true, err

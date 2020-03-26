@@ -87,7 +87,7 @@ OPERATOR_TAG_LONG ?= $(OPERATOR_VERSION)-$(GIT_COMMIT_ID)
 
 QUAY_TOKEN ?= ""
 
-MANIFESTS_DIR ?= ./manifests
+MANIFESTS_DIR ?= ./deploy/olm-catalog/jenkins-operator/
 MANIFESTS_TMP ?= ./tmp/manifests
 
 GOLANGCI_LINT_BIN=./out/golangci-lint
@@ -293,7 +293,7 @@ setup-venv:
 # Validate manifests using operator-courier
 courier:
 	$(Q)./out/venv3/bin/pip install operator-courier
-	$(Q)./out/venv3/bin/operator-courier flatten ./manifests ./out/manifests
+	$(Q)./out/venv3/bin/operator-courier flatten $(MANIFESTS_DIR)  ./out/manifests
 	$(Q)./out/venv3/bin/operator-courier verify ./out/manifests
 
 

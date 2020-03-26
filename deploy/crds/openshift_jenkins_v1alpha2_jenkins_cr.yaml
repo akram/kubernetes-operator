@@ -21,5 +21,3 @@ spec:
           - "bash"
           - "-c"
           - "/var/jenkins/scripts/init.sh && exec /usr/bin/go-init -main /usr/libexec/s2i/run"
-
-

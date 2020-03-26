@@ -566,8 +566,14 @@ func (r *ReconcileJenkinsBaseConfiguration) calculateUserAndPasswordHash() (stri
 	}
 
 	hash := sha256.New()
-	hash.Write(credentialsSecret.Data[resources.OperatorCredentialsSecretUserNameKey])
-	hash.Write(credentialsSecret.Data[resources.OperatorCredentialsSecretPasswordKey])
+	_, err = hash.Write(credentialsSecret.Data[resources.OperatorCredentialsSecretUserNameKey])
+        if err != nil {
+                return "", stackerr.WithStack(err)
+        }
+	_, err = hash.Write(credentialsSecret.Data[resources.OperatorCredentialsSecretPasswordKey])
+        if err != nil {
+                return "", stackerr.WithStack(err)
+        }
 	return base64.StdEncoding.EncodeToString(hash.Sum(nil)), nil
 }
 

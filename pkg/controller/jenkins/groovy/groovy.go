@@ -182,8 +182,14 @@ func (g *Groovy) calculateHash(data map[string]string) string {
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		hash.Write([]byte(key))
-		hash.Write([]byte(data[key]))
+                _, err := hash.Write([]byte(key))
+                if err != nil {
+                        g.logger.V(log.VWarn).Info("Error while writing hash")
+                }
+                _, err = hash.Write([]byte(data[key]))
+                if err != nil {
+                        g.logger.V(log.VWarn).Info("Error while writing hash")
+                }
 	}
 	return base64.StdEncoding.EncodeToString(hash.Sum(nil))
 }
