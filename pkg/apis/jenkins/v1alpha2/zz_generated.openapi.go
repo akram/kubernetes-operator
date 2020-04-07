@@ -11,9 +11,9 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"./pkg/apis/jenkins/v1alpha2.Jenkins":       schema_pkg_apis_jenkins_v1alpha2_Jenkins(ref),
-		"./pkg/apis/jenkins/v1alpha2.JenkinsSpec":   schema_pkg_apis_jenkins_v1alpha2_JenkinsSpec(ref),
-		"./pkg/apis/jenkins/v1alpha2.JenkinsStatus": schema_pkg_apis_jenkins_v1alpha2_JenkinsStatus(ref),
+		"github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Jenkins":       schema_pkg_apis_jenkins_v1alpha2_Jenkins(ref),
+		"github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsSpec":   schema_pkg_apis_jenkins_v1alpha2_JenkinsSpec(ref),
+		"github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsStatus": schema_pkg_apis_jenkins_v1alpha2_JenkinsStatus(ref),
 	}
 }
 
@@ -46,20 +46,20 @@ func schema_pkg_apis_jenkins_v1alpha2_Jenkins(ref common.ReferenceCallback) comm
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec defines the desired state of the Jenkins",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.JenkinsSpec"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status defines the observed state of Jenkins",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.JenkinsStatus"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsStatus"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"./pkg/apis/jenkins/v1alpha2.JenkinsSpec", "./pkg/apis/jenkins/v1alpha2.JenkinsStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsSpec", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -73,7 +73,7 @@ func schema_pkg_apis_jenkins_v1alpha2_JenkinsSpec(ref common.ReferenceCallback) 
 					"master": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Master represents Jenkins master pod properties and Jenkins plugins. Every single change here requires a pod restart.",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.JenkinsMaster"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsMaster"),
 						},
 					},
 					"seedJobs": {
@@ -83,7 +83,7 @@ func schema_pkg_apis_jenkins_v1alpha2_JenkinsSpec(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("./pkg/apis/jenkins/v1alpha2.SeedJob"),
+										Ref: ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.SeedJob"),
 									},
 								},
 							},
@@ -96,7 +96,7 @@ func schema_pkg_apis_jenkins_v1alpha2_JenkinsSpec(ref common.ReferenceCallback) 
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("./pkg/apis/jenkins/v1alpha2.Notification"),
+										Ref: ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Notification"),
 									},
 								},
 							},
@@ -105,37 +105,37 @@ func schema_pkg_apis_jenkins_v1alpha2_JenkinsSpec(ref common.ReferenceCallback) 
 					"service": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Service is Kubernetes service of Jenkins master HTTP pod Defaults to : port: 8080 type: ClusterIP",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.Service"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Service"),
 						},
 					},
 					"slaveService": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Service is Kubernetes service of Jenkins slave pods Defaults to : port: 50000 type: ClusterIP",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.Service"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Service"),
 						},
 					},
 					"backup": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Backup defines configuration of Jenkins backup More info: https://github.com/jenkinsci/kubernetes-operator/blob/master/docs/getting-started.md#configure-backup-and-restore",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.Backup"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Backup"),
 						},
 					},
 					"restore": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Backup defines configuration of Jenkins backup restore More info: https://github.com/jenkinsci/kubernetes-operator/blob/master/docs/getting-started.md#configure-backup-and-restore",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.Restore"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Restore"),
 						},
 					},
 					"groovyScripts": {
 						SchemaProps: spec.SchemaProps{
 							Description: "GroovyScripts defines configuration of Jenkins customization via groovy scripts",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.GroovyScripts"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.GroovyScripts"),
 						},
 					},
 					"configurationAsCode": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ConfigurationAsCode defines configuration of Jenkins customization via Configuration as Code Jenkins plugin",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.ConfigurationAsCode"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.ConfigurationAsCode"),
 						},
 					},
 					"roles": {
@@ -154,13 +154,13 @@ func schema_pkg_apis_jenkins_v1alpha2_JenkinsSpec(ref common.ReferenceCallback) 
 					"serviceAccount": {
 						SchemaProps: spec.SchemaProps{
 							Description: "ServiceAccount defines Jenkins master service account attributes",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.ServiceAccount"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.ServiceAccount"),
 						},
 					},
 					"jenkinsAPISettings": {
 						SchemaProps: spec.SchemaProps{
 							Description: "JenkinsAPISettings defines configuration used by the operator to gain admin access to the Jenkins API",
-							Ref:         ref("./pkg/apis/jenkins/v1alpha2.JenkinsAPISettings"),
+							Ref:         ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsAPISettings"),
 						},
 					},
 				},
@@ -168,7 +168,7 @@ func schema_pkg_apis_jenkins_v1alpha2_JenkinsSpec(ref common.ReferenceCallback) 
 			},
 		},
 		Dependencies: []string{
-			"./pkg/apis/jenkins/v1alpha2.Backup", "./pkg/apis/jenkins/v1alpha2.ConfigurationAsCode", "./pkg/apis/jenkins/v1alpha2.GroovyScripts", "./pkg/apis/jenkins/v1alpha2.JenkinsAPISettings", "./pkg/apis/jenkins/v1alpha2.JenkinsMaster", "./pkg/apis/jenkins/v1alpha2.Notification", "./pkg/apis/jenkins/v1alpha2.Restore", "./pkg/apis/jenkins/v1alpha2.SeedJob", "./pkg/apis/jenkins/v1alpha2.Service", "./pkg/apis/jenkins/v1alpha2.ServiceAccount", "k8s.io/api/rbac/v1.RoleRef"},
+			"github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Backup", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.ConfigurationAsCode", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.GroovyScripts", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsAPISettings", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.JenkinsMaster", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Notification", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Restore", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.SeedJob", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.Service", "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.ServiceAccount", "k8s.io/api/rbac/v1.RoleRef"},
 	}
 }
 
@@ -260,7 +260,7 @@ func schema_pkg_apis_jenkins_v1alpha2_JenkinsStatus(ref common.ReferenceCallback
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("./pkg/apis/jenkins/v1alpha2.AppliedGroovyScript"),
+										Ref: ref("github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.AppliedGroovyScript"),
 									},
 								},
 							},
@@ -270,6 +270,6 @@ func schema_pkg_apis_jenkins_v1alpha2_JenkinsStatus(ref common.ReferenceCallback
 			},
 		},
 		Dependencies: []string{
-			"./pkg/apis/jenkins/v1alpha2.AppliedGroovyScript", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2.AppliedGroovyScript", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }

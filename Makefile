@@ -1,6 +1,5 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
-VERBOSE ?= 1
 Q = @
 Q_FLAG = -q
 QUIET_FLAG = --quiet
@@ -11,18 +10,6 @@ UNAME_S := $(shell uname -s)
 CONTAINER_BUILDER = buildah
 CONTAINER_RUNNER = podman
 GOOS=linux
-ifeq ($(VERBOSE),1)
-	Q =
-endif
-ifeq ($(VERBOSE),2)
-	Q =
-	Q_FLAG =
-	QUIET_FLAG =
-	S_FLAG =
-	V_FLAG = -v
-	X_FLAG = -x
-endif
-
 ifeq ($(UNAME_S),Darwin)
 	CONTAINER_BUILDER = docker
 	CONTAINER_RUNNER = docker
@@ -64,7 +51,7 @@ help: ## Credit: https://gist.github.com/prwhite/8168133#gistcomment-2749866
 GO_PACKAGE_ORG_NAME ?= $(shell basename $$(dirname $$PWD))
 GO_PACKAGE_REPO_NAME ?= $(shell basename $$PWD)
 GO_PACKAGE_PATH ?= github.com/${GO_PACKAGE_ORG_NAME}/${GO_PACKAGE_REPO_NAME}
-
+GO_PACKAGE_REPO_NAME = jenkins-operator
 CGO_ENABLED ?= 0
 GO111MODULE ?= on
 GOCACHE ?= "$(shell echo ${PWD})/out/gocache"
@@ -79,7 +66,7 @@ GOCOV ?= "-covermode=atomic -coverprofile REPLACE_FILE"
 
 GIT_COMMIT_ID = $(shell git rev-parse --short HEAD)
 
-OPERATOR_VERSION ?= 0.0.1
+OPERATOR_VERSION ?= 0.0.4
 OPERATOR_GROUP ?= ${GO_PACKAGE_ORG_NAME}
 OPERATOR_IMAGE ?= quay.io/${OPERATOR_GROUP}/${GO_PACKAGE_REPO_NAME}
 OPERATOR_TAG_SHORT ?= $(OPERATOR_VERSION)
@@ -160,12 +147,9 @@ e2e-setup: e2e-cleanup
 e2e-cleanup: get-test-namespace
 	$(Q)-kubectl delete namespace $(TEST_NAMESPACE) --timeout=45s --wait
 
-
 .PHONY: test
 # Test: Runs unit and integration (e2e) tests
 test: unit-tests e2e-tests
-
-
 
 .PHONY: lint
 ## Runs linters on Go code files and YAML files - DISABLED TEMPORARILY
@@ -185,8 +169,6 @@ lint-go-code: $(GOLANGCI_LINT_BIN)
 
 $(GOLANGCI_LINT_BIN):
 	$(Q)curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./out v1.19.1
-
-
 
 .PHONY: coverage
 ## Runs the unit tests with code coverage
@@ -209,9 +191,8 @@ e2e-tests-olm-ci:
 	$(Q)./hack/check-crds.sh
 	$(Q)operator-sdk --verbose test local ./test/e2e --no-setup --go-test-flags "-timeout=15m"
 
-
 out/operator:
-	$(Q)GOARCH=amd64 GOOS=$(GOOS) go build ${V_FLAG} -o ./out/operator cmd/manager/main.go
+	$(Q)GOARCH=amd64 GOOS=$(GOOS) go build ${V_FLAG} -o ./out/$(GO_PACKAGE_REPO_NAME) cmd/manager/main.go
 
 ## Build-Image: using operator-sdk to build a new image
 build-image:
@@ -255,7 +236,6 @@ push-image: build-image
 	$(CONTAINER_RUNNER) push "$(OPERATOR_IMAGE):$(OPERATOR_TAG_LONG)"
 	$(CONTAINER_RUNNER) push "$(OPERATOR_IMAGE):latest"
 
-
 .PHONY: deploy-rbac
 # Deploy-RBAC: Setup service account and deploy RBAC
 deploy-rbac:
@@ -295,8 +275,6 @@ courier:
 	$(Q)./out/venv3/bin/pip install operator-courier
 	$(Q)./out/venv3/bin/operator-courier flatten $(MANIFESTS_DIR)  ./out/manifests
 	$(Q)./out/venv3/bin/operator-courier verify ./out/manifests
-
-
 
 .PHONY: upload-codecov-report
 # Uploads the test coverage reports to codecov.io.
