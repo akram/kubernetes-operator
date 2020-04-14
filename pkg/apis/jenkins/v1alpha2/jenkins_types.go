@@ -65,6 +65,11 @@ type JenkinsSpec struct {
 
 	// JenkinsAPISettings defines configuration used by the operator to gain admin access to the Jenkins API
 	JenkinsAPISettings JenkinsAPISettings `json:"jenkinsAPISettings"`
+
+	// ReconciliationLevel defines how strong the Operator enforces settings during
+	// reconciliation: strict, loose or free
+	ReconciliationLevel ReconciliationLevel `json:"reconciliationLevel"`
+
 }
 
 // AuthorizationStrategy defines authorization strategy of the operator for the Jenkins API
@@ -91,6 +96,22 @@ type ServiceAccount struct {
 	// +optional
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
+
+// ReconciliationLevel defines the level of a Reconciliation
+type ReconciliationLevel string
+
+const (
+	// strictly enforces all Operator configuration everywhere
+	ReconciliationLevelStrict ReconciliationLevel = "strict"
+
+	// enforces and reconciles only "vital" parameters, meaning that
+	//changing them would trigger instability
+	ReconciliationLevelLoose ReconciliationLevel = "loose"
+
+	// Doesn't enforce anything
+	ReconciliationLevelFree ReconciliationLevel = "free"
+)
+
 
 // NotificationLevel defines the level of a Notification
 type NotificationLevel string

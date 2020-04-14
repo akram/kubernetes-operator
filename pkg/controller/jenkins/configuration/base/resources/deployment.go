@@ -25,7 +25,7 @@ var (
 )
 
 // newJenkinsDeployment returns a jenkins Deployment with the same name/namespace as the cr
-func newJenkinsDeployment(cr *jenkinsv1.Jenkins, jenkinsService, jenkinsJNLPService string, isPersistent bool) *kappsv1.Deployment {
+func newJenkinsDeployment(cr *jenkinsv1.Jenkins, jenkinsService string, jenkinsJNLPService string, isPersistent bool) *kappsv1.Deployment {
 	jenkinsInstanceName := cr.Name
 	labels := map[string]string{
 		JenkinsAppLabelName: cr.Name,

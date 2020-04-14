@@ -24,7 +24,9 @@ var (
 // Validate validates Jenkins CR Spec.master section
 func (r *ReconcileJenkinsBaseConfiguration) Validate(jenkins *v1alpha2.Jenkins) ([]string, error) {
 	var messages []string
-
+	if r.Configuration.Jenkins.Spec.ReconciliationLevel == v1alpha2.ReconciliationLevelFree  {
+		return nil, nil
+	}
 	if msg := r.validateReservedVolumes(); len(msg) > 0 {
 		messages = append(messages, msg...)
 	}

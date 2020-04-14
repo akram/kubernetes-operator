@@ -55,9 +55,14 @@ func New(config configuration.Configuration, logger logr.Logger, jenkinsAPIConne
 
 // Reconcile takes care of base configuration
 func (r *ReconcileJenkinsBaseConfiguration) Reconcile() (reconcile.Result, jenkinsclient.Jenkins, error) {
+	jenkinsClient, err := r.ensureJenkinsClient()
+
+	if r.Configuration.Jenkins.Spec.ReconciliationLevel == v1alpha2.ReconciliationLevelFree  {
+		return reconcile.Result{Requeue: false}, jenkinsClient, err
+	}
 	metaObject := resources.NewResourceObjectMeta(r.Configuration.Jenkins)
 
-	err := r.ensureResourcesRequiredForJenkinsPod(metaObject)
+	err = r.ensureResourcesRequiredForJenkinsPod(metaObject)
 	if err != nil {
 		return reconcile.Result{}, nil, err
 	}
@@ -89,7 +94,6 @@ func (r *ReconcileJenkinsBaseConfiguration) Reconcile() (reconcile.Result, jenki
 	}
 	r.logger.V(log.VDebug).Info("Jenkins master pod is ready")
 
-	jenkinsClient, err := r.ensureJenkinsClient()
 	if err != nil {
 		return reconcile.Result{}, nil, err
 	}

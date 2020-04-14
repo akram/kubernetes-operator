@@ -2,9 +2,9 @@ package resources
 
 import (
 	"fmt"
-
 	"github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha2"
 	"github.com/jenkinsci/kubernetes-operator/pkg/controller/jenkins/constants"
+	kappsv1 "k8s.io/api/apps/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -310,24 +310,14 @@ func GetJenkinsMasterPodLabels(jenkins v1alpha2.Jenkins) map[string]string {
 }
 
 // NewJenkinsMasterPod builds Jenkins Master Kubernetes Pod resource
-func NewJenkinsMasterPod(objectMeta metav1.ObjectMeta, jenkins *v1alpha2.Jenkins) *corev1.Pod {
-	serviceAccountName := objectMeta.Name
+func NewJenkinsMasterPod(objectMeta metav1.ObjectMeta, jenkins *v1alpha2.Jenkins) *kappsv1.Deployment {
+	//serviceAccountName := objectMeta.Name
 	objectMeta.Annotations = jenkins.Spec.Master.Annotations
 	objectMeta.Name = GetJenkinsMasterPodName(*jenkins)
 	objectMeta.Labels = GetJenkinsMasterPodLabels(*jenkins)
 
-	return &corev1.Pod{
-		TypeMeta:   buildPodTypeMeta(),
-		ObjectMeta: objectMeta,
-		Spec: corev1.PodSpec{
-			ServiceAccountName: serviceAccountName,
-			RestartPolicy:      corev1.RestartPolicyNever,
-			NodeSelector:       jenkins.Spec.Master.NodeSelector,
-			Containers:         newContainers(jenkins),
-			Volumes:            append(GetJenkinsMasterPodBaseVolumes(jenkins), jenkins.Spec.Master.Volumes...),
-			SecurityContext:    jenkins.Spec.Master.SecurityContext,
-			ImagePullSecrets:   jenkins.Spec.Master.ImagePullSecrets,
-			Tolerations:        jenkins.Spec.Master.Tolerations,
-		},
-	}
+	jenkinsServiceName :=  jenkins.Name
+	jenkinsJNLPServiceName:= jenkins.Name  + "-jnlp"
+	deployment := newJenkinsDeployment(jenkins,  jenkinsServiceName, jenkinsJNLPServiceName , true)
+	return deployment
 }
