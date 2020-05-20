@@ -2,6 +2,7 @@ package jenkinsimage
 
 import (
 	"context"
+
 	"github.com/jenkinsci/kubernetes-operator/pkg/configuration/base/resources"
 
 	jenkinsv1alpha3 "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha3"
@@ -21,7 +22,6 @@ import (
 )
 
 var log = logf.Log.WithName("controller_jenkinsimage")
-
 
 // Add creates a new JenkinsImage Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
@@ -147,4 +147,3 @@ func (r *ReconcileJenkinsImage) Reconcile(request reconcile.Request) (reconcile.
 
 	return reconcile.Result{}, nil
 }
-

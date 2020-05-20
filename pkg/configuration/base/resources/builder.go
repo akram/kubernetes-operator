@@ -2,6 +2,7 @@ package resources
 
 import (
 	"fmt"
+
 	jenkinsv1alpha3 "github.com/jenkinsci/kubernetes-operator/pkg/apis/jenkins/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -14,6 +15,8 @@ const (
 	BuilderDockerfileArg         = "--dockerfile=/workspace/dockerfile/Dockerfile"
 	BuilderContextDirArg         = "--context=dir://workspace/"
 	BuilderPushArg               = "--no-push"
+	BuilderDigestFileArg         = "--digest-file=/dev/termination-log"
+	BuilderSuffix                = "builder"
 	DockerfileStorageSuffix      = "dockerfile-storage"
 	DockerfileNameSuffix         = "dockerfile"
 	JenkinsImageBuilderImage     = "gcr.io/kaniko-project/executor:latest"
@@ -30,12 +33,13 @@ var log = logf.Log.WithName("controller_jenkinsimage")
 
 // NewBuilderPod returns a busybox pod with the same name/namespace as the cr.
 func NewBuilderPod(cr *jenkinsv1alpha3.JenkinsImage) *corev1.Pod {
+	name := fmt.Sprintf(NameWithSuffixFormat, cr.Name, BuilderSuffix)
+	args := []string{BuilderDockerfileArg, BuilderContextDirArg, BuilderPushArg, BuilderDigestFileArg}
 	volumes := getVolumes(cr)
 	volumeMounts := getVolumesMounts(cr)
-name:
 	p := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-builder",
+			Name:      name,
 			Namespace: cr.Namespace,
 		},
 		Spec: corev1.PodSpec{
@@ -44,7 +48,7 @@ name:
 				{
 					Name:         JenkinsImageBuilderName,
 					Image:        JenkinsImageBuilderImage,
-					Args:         []string{BuilderDockerfileArg, BuilderContextDirArg, BuilderPushArg},
+					Args:         args,
 					VolumeMounts: volumeMounts,
 				},
 			},
