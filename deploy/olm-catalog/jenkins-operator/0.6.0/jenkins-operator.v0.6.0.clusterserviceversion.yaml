@@ -300,10 +300,22 @@ spec:
     - description: Jenkins is the Schema for the jenkins API
       kind: Jenkins
       name: jenkins.jenkins.io
+      version: v1alpha2
+    - description: Jenkins is the Schema for the jenkins API
+      kind: Jenkins
+      name: jenkins.jenkins.io
       version: v1alpha1
     - description: JenkinsImageBuild is the Schema for the jenkinsimagebuilds API
       kind: JenkinsImageBuild
       name: jenkinsimagebuilds.jenkins.io
+      version: v1alpha2
+    - description: JenkinsImageBuild is the Schema for the jenkinsimagebuilds API
+      kind: JenkinsImageBuild
+      name: jenkinsimagebuilds.jenkins.io
+      version: v1alpha2
+    - description: JenkinsImage is the Schema for the jenkinsimages API
+      kind: JenkinsImage
+      name: jenkinsimages.jenkins.io
       version: v1alpha2
     - description: JenkinsImage is the Schema for the jenkinsimages API
       kind: JenkinsImage

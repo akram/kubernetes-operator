@@ -8,6 +8,7 @@ import (
 
 // JenkinsSpec defines the desired state of the Jenkins.
 // +k8s:openapi-gen=true
+// +operator-sdk:csv:customresourcedefinitions:displayName="Jenkins"
 type JenkinsSpec struct {
 	// Master represents Jenkins master pod properties and Jenkins plugins.
 	// Every single change here requires a pod restart.

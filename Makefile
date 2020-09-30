@@ -565,7 +565,28 @@ helm-deploy: helm-package
 
 .PHONY: generate
 # Generate manifests e.g. CRD, RBAC etc.
-generate: 
+generate: controller-gen
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) crd:trivialVersions=false rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=deploy/crds/
+
+# find or download controller-gen
+# download controller-gen if necessary
+controller-gen:
+ifeq (, $(shell which controller-gen))
+	@{ \
+	set -e ;\
+	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
+	cd $$CONTROLLER_GEN_TMP_DIR ;\
+	go mod init tmp ;\
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.3.0 ;\
+	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
+	}
+CONTROLLER_GEN=$(GOBIN)/controller-gen
+else
+CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
+generate-old: 
 	operator-sdk generate crds
 	operator-sdk generate k8s
 	operator-sdk generate csv --csv-version=0.6.0 --update-crds --make-manifests=false --operator-name=jenkins-operator
@@ -662,3 +683,5 @@ test-smoke-artifacts:
 	$(Q)echo "Gathering smoke tests artifacts"
 	$(Q)mkdir -p $(TEST_SMOKE_ARTIFACTS) \
 	    && cp -rvf $(TEST_SMOKE_OUTPUT_DIR) $(TEST_SMOKE_ARTIFACTS)/
+FORCE:
+

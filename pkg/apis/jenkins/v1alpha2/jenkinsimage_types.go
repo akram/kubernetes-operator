@@ -40,9 +40,8 @@ type Image struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	Registry string `json:"registry,omitempty"`
 	// Secret is an optional reference to a secret in the same namespace to use for pushing to or pulling from the registry.
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	// +operator-sdk:csv:customresourcedefinitions:xDescriptors="urn:alm:descriptor:kubernetes.io:Secret"
-
+	// +operator-sdk:csv:customresourcedefinitions:xDescriptors="urn:alm:descriptor:io.kubernetes:Secret"
+	//+operator-sdk:csv:customresourcedefinitions:type=[spec,status]
 	Secret string `json:"secret,omitempty"`
 }
 
