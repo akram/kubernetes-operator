@@ -313,6 +313,10 @@ spec:
       kind: JenkinsImage
       name: jenkinsimages.jenkins.io
       version: v1alpha2
+    - description: JenkinsImage is the Schema for the jenkinsimages API
+      kind: JenkinsImage
+      name: jenkinsimages.jenkins.io
+      version: v1alpha2
   displayName: Jenkins Operator
   icon:
   - base64data: ""

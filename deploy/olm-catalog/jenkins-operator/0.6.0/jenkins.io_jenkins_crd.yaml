@@ -149,18 +149,20 @@ spec:
                         https://updates.jenkins.io/ is used
                       type: string
                     from:
-                      description: Defines Jenkins Plugin structure
+                      description: A JenkinsImage definition
                       properties:
                         name:
+                          description: The Image name
                           type: string
                         registry:
+                          description: The registry to pull from or push to this image
+                            in the form fully.qdn/myrepository/ Image name will be
+                            appended for push
                           type: string
                         secret:
-                          description: Secret is an optional reference to a secret
-                            in the same namespace to use for pushing to or pulling
-                            from the registry.
                           type: string
                         tag:
+                          description: The tag name
                           type: string
                       required:
                       - name
@@ -183,18 +185,20 @@ spec:
                         type: object
                       type: array
                     to:
-                      description: Defines Jenkins Plugin structure
+                      description: A JenkinsImage definition
                       properties:
                         name:
+                          description: The Image name
                           type: string
                         registry:
+                          description: The registry to pull from or push to this image
+                            in the form fully.qdn/myrepository/ Image name will be
+                            appended for push
                           type: string
                         secret:
-                          description: Secret is an optional reference to a secret
-                            in the same namespace to use for pushing to or pulling
-                            from the registry.
                           type: string
                         tag:
+                          description: The tag name
                           type: string
                       required:
                       - name
