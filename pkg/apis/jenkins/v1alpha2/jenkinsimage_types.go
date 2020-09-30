@@ -26,17 +26,29 @@ type JenkinsPlugin struct {
 	UpdateCenter string `json:"updateCenter,omitempty"`
 }
 
-// Defines Jenkins Plugin structure
+// A JenkinsImage definition
+// +operator-sdk:csv:customresourcedefinitions:type=spec
 type Image struct {
+	// The Image name
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	Name     string `json:"name"`
+	// The tag name
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	Tag      string `json:"tag,omitempty"`
+	// The registry to pull from or push to this image in the form fully.qdn/myrepository/
+	// Image name will be appended for push
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	Registry string `json:"registry,omitempty"`
 	// Secret is an optional reference to a secret in the same namespace to use for pushing to or pulling from the registry.
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// +operator-sdk:csv:customresourcedefinitions:xDescriptors="urn:alm:descriptor:kubernetes.io:Secret"
+
 	Secret string `json:"secret,omitempty"`
 }
 
 // JenkinsImageStatus defines the observed state of JenkinsImage
 type JenkinsImageStatus struct {
+	// +operator-sdk:csv:customresourcedefinitions.type=status
 	Image            string          `json:"image,omitempty"`
 	MD5Sum           string          `json:"md5sum,omitempty"`
 	InstalledPlugins []JenkinsPlugin `json:"installedPlugins,omitempty"`

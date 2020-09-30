@@ -43,7 +43,7 @@ TEST_SMOKE_OUTPUT_DIR ?= $(OUTPUT_DIR)/smoke-tests
 TEST_SMOKE_ARTIFACTS ?= /tmp/artifacts
 
 # Release version for redhat operator
-OLM_OPERATOR_VERSION ?= 0.6.0
+OLM_OPERATOR_VERSION ?= 0.4.1
 GIT_COMMIT_ID ?= $(shell git rev-parse --short HEAD)
 OLM_OPERATOR_TAG_SHORT ?= $(OLM_OPERATOR_VERSION)
 OLM_OPERATOR_TAG_LONG ?= $(OLM_OPERATOR_VERSION)-$(GIT_COMMIT_ID)
@@ -212,7 +212,6 @@ endif
 	cp deploy/service_account.yaml deploy/namespace-init.yaml
 	cat deploy/role.yaml >> deploy/namespace-init.yaml
 	cat deploy/role_binding.yaml >> deploy/namespace-init.yaml
-	cat deploy/default-config.yaml >> deploy/namespace-init.yaml
 ifneq ($(BUILDTAGS), Helm)
 	cat deploy/operator.yaml >> deploy/namespace-init.yaml
 endif
@@ -233,14 +232,14 @@ endif
 
 ifeq ($(OSFLAG), OSX)
 ifeq ($(IMAGE_PULL_MODE), remote)
-	sed -i '' 's|\(image:\).*|\1 $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(GITCOMMIT)|g' deploy/namespace-init.yaml
-	sed -i '' 's|\(imagePullPolicy\): IfNotPresent|\1: Always|g' deploy/namespace-init.yaml
+	sed -i 's|\(image:\).*|\1 $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(GITCOMMIT)|g' deploy/namespace-init.yaml
+	sed -i 's|\(imagePullPolicy\): IfNotPresent|\1: Always|g' deploy/namespace-init.yaml
 else
-	sed -i '' 's|\(image:\).*|\1 $(DOCKER_REGISTRY):$(GITCOMMIT)|g' deploy/namespace-init.yaml
+	sed -i 's|\(image:\).*|\1 $(DOCKER_REGISTRY):$(GITCOMMIT)|g' deploy/namespace-init.yaml
 	sed -i '' 's|image: virtuslab/jenkins-operator:.*|image: $(DOCKER_REGISTRY):$(GITCOMMIT)|g' chart/jenkins-operator/values.yaml	
 endif
 ifeq ($(KUBERNETES_PROVIDER),minikube)
-	sed -i '' 's|\(imagePullPolicy\): IfNotPresent|\1: Never|g' deploy/namespace-init.yaml
+	sed -i 's|\(imagePullPolicy\): IfNotPresent|\1: Never|g' deploy/namespace-init.yaml
 endif
 endif
 
@@ -563,6 +562,13 @@ helm-deploy: helm-package
 	@echo "+ $@"
 	helm repo index chart/ --url https://raw.githubusercontent.com/jenkinsci/kubernetes-operator/master/chart/jenkins-operator/
 	cd chart/ && mv jenkins-operator-*.tgz jenkins-operator
+
+.PHONY: generate
+# Generate manifests e.g. CRD, RBAC etc.
+generate: 
+	operator-sdk generate crds
+	operator-sdk generate k8s
+	operator-sdk generate csv --csv-version=0.6.0 --update-crds --make-manifests=false --operator-name=jenkins-operator
 
 .PHONY: generate-docs
 generate-docs: ## Re-generate docs directory from the website directory
