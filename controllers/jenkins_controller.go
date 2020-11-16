@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	kevent "sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/go-logr/logr"
 	"github.com/jenkinsci/kubernetes-operator/api/v1alpha2"
@@ -48,8 +50,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
 	//	"math/rand"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
@@ -72,7 +72,8 @@ const (
 
 	ConditionReconcileComplete conditionsv1.ConditionType = "ReconciliationComplete"
 
-	DefaultBackupConfigName = "default"
+	DefaultBackupConfigName        = "default"
+	IgnoreReconciliationAnnotation = "jekins-operator.ignore"
 )
 
 // JenkinsReconciler reconciles a Jenkins object
@@ -98,8 +99,20 @@ func (r *JenkinsReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
 		WithEventFilter(predicate.GenerationChangedPredicate{}).
+		WithEventFilter(doesNotHaveAnnotationPredicate(IgnoreReconciliationAnnotation)).
 		Complete(r)
 	// Owns(&routev1.Route{}).Complete(r)
+}
+
+func doesNotHaveAnnotationPredicate(annotation string) predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e kevent.UpdateEvent) bool {
+			// Ignore updates to CR status that has annotation
+			doesNotHaveAnnotation := len(e.MetaNew.GetAnnotations()[annotation]) == 0
+			logger.Info(fmt.Sprintf("Update event received for %s with annotations %s set.", e.MetaNew.GetName(), e.MetaNew.GetAnnotations()))
+			return doesNotHaveAnnotation
+		},
+	}
 }
 
 // +kubebuilder:rbac:groups=jenkins.io,resources=jenkins,verbs=get;list;watch;create;update;patch;delete
