@@ -21,7 +21,7 @@ func configureAuthorizationToUnSecure(namespace, configMapName string) {
 			Namespace: namespace,
 		},
 		Data: map[string]string{
-			"set-unsecured-authorization.groovy": `
+			"8-set-unsecured-authorization.groovy": `
 import hudson.security.*
 
 def jenkins = jenkins.model.Jenkins.getInstance()
@@ -33,9 +33,10 @@ jenkins.save()
 		},
 	}
 
-	Expect(k8sClient.Create(context.TODO(), limitRange)).Should(Succeed())
+	Expect(K8sClient.Create(context.TODO(), limitRange)).Should(Succeed())
 }
 
+//lint:ignore U1000 Ignore unused function temporarily
 func checkIfAuthorizationStrategyUnsecuredIsSet(jenkinsClient jenkinsclient.Jenkins) {
 	By("checking if Authorization Strategy Unsecured is set")
 
@@ -56,7 +57,7 @@ func checkBaseConfigurationCompleteTimeIsNotSet(jenkins *v1alpha2.Jenkins) {
 
 	Eventually(func() (bool, error) {
 		actualJenkins := &v1alpha2.Jenkins{}
-		err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: jenkins.Name, Namespace: jenkins.Namespace}, actualJenkins)
+		err := K8sClient.Get(context.TODO(), types.NamespacedName{Name: jenkins.Name, Namespace: jenkins.Namespace}, actualJenkins)
 		if err != nil {
 			return false, err
 		}

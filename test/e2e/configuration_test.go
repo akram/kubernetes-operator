@@ -23,6 +23,16 @@ import (
 
 const e2e = "e2e"
 
+var expectedBasePluginsList = []plugins.Plugin{
+	plugins.Must(plugins.New("configuration-as-code:1850.va_a_8c31d3158b_")),
+	plugins.Must(plugins.New("git:5.5.2")),
+	plugins.Must(plugins.New("kubernetes:4295.v7fa_01b_309c95")),
+	plugins.Must(plugins.New("kubernetes-credentials-provider:1.262.v2670ef7ea_0c5")),
+	plugins.Must(plugins.New("job-dsl:1.89")),
+	plugins.Must(plugins.New("workflow-aggregator:600.vb_57cdd26fdd7")),
+	plugins.Must(plugins.New("workflow-job:1436.vfa_244484591f")),
+}
+
 func createUserConfigurationSecret(namespace string, stringData map[string]string) {
 	By("creating user configuration secret")
 
@@ -35,7 +45,7 @@ func createUserConfigurationSecret(namespace string, stringData map[string]strin
 	}
 
 	_, _ = fmt.Fprintf(GinkgoWriter, "User configuration secret %+v\n", *userConfiguration)
-	Expect(k8sClient.Create(context.TODO(), userConfiguration)).Should(Succeed())
+	Expect(K8sClient.Create(context.TODO(), userConfiguration)).Should(Succeed())
 }
 
 func createUserConfigurationConfigMap(namespace string, numberOfExecutorsSecretKeyName string, systemMessage string) {
@@ -63,7 +73,7 @@ unclassified:
 	}
 
 	_, _ = fmt.Fprintf(GinkgoWriter, "User configuration %+v\n", *userConfiguration)
-	Expect(k8sClient.Create(context.TODO(), userConfiguration)).Should(Succeed())
+	Expect(K8sClient.Create(context.TODO(), userConfiguration)).Should(Succeed())
 }
 
 func createDefaultLimitsForContainersInNamespace(namespace string) {
@@ -92,7 +102,7 @@ func createDefaultLimitsForContainersInNamespace(namespace string) {
 	}
 
 	_, _ = fmt.Fprintf(GinkgoWriter, "LimitRange %+v\n", *limitRange)
-	Expect(k8sClient.Create(context.TODO(), limitRange)).Should(Succeed())
+	Expect(K8sClient.Create(context.TODO(), limitRange)).Should(Succeed())
 }
 
 func verifyJenkinsMasterPodAttributes(jenkins *v1alpha2.Jenkins) {
@@ -100,6 +110,8 @@ func verifyJenkinsMasterPodAttributes(jenkins *v1alpha2.Jenkins) {
 
 	jenkinsPod := getJenkinsMasterPod(jenkins)
 	jenkins = getJenkins(jenkins.Namespace, jenkins.Name)
+
+	defaultGracePeriod := constants.DefaultTerminationGracePeriodSeconds
 
 	assertMapContainsElementsFromAnotherMap(jenkins.Spec.Master.Annotations, jenkinsPod.ObjectMeta.Annotations)
 	Expect(jenkinsPod.Spec.NodeSelector).Should(Equal(jenkins.Spec.Master.NodeSelector))
@@ -115,6 +127,7 @@ func verifyJenkinsMasterPodAttributes(jenkins *v1alpha2.Jenkins) {
 
 	Expect(jenkinsPod.Labels).Should(Equal(resources.GetJenkinsMasterPodLabels(*jenkins)))
 	Expect(jenkinsPod.Spec.PriorityClassName).Should(Equal(jenkins.Spec.Master.PriorityClassName))
+	Expect(jenkinsPod.Spec.TerminationGracePeriodSeconds).Should(Equal(&defaultGracePeriod))
 
 	for _, actualContainer := range jenkinsPod.Spec.Containers {
 		if actualContainer.Name == resources.JenkinsMasterContainerName {
@@ -148,7 +161,7 @@ func verifyJenkinsMasterPodAttributes(jenkins *v1alpha2.Jenkins) {
 		}
 
 		if !volumeFound {
-			Fail(fmt.Sprintf("Missing volume '+%v', actaul volumes '%+v'", expectedVolume, jenkinsPod.Spec.Volumes))
+			Fail(fmt.Sprintf("Missing volume '+%v', actual volumes '%+v'", expectedVolume, jenkinsPod.Spec.Volumes))
 		}
 	}
 }
@@ -179,7 +192,7 @@ func verifyPlugins(jenkinsClient jenkinsclient.Jenkins, jenkins *v1alpha2.Jenkin
 	installedPlugins, err := jenkinsClient.GetPlugins(1)
 	Expect(err).NotTo(HaveOccurred())
 
-	for _, basePlugin := range plugins.BasePlugins() {
+	for _, basePlugin := range expectedBasePluginsList {
 		if found, ok := isPluginValid(installedPlugins, basePlugin); !ok {
 			Fail(fmt.Sprintf("Invalid plugin '%s', actual '%+v'", basePlugin, found))
 		}

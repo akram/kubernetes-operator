@@ -1,0 +1,89 @@
+name: Publish nightly snapshot
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      skipTests:
+        description: "Flag for skipping the tests. If set to true (without quotation marks), the workflow will skip tests and go straight to releasing the nightly build. Use with caution!"
+        required: false
+
+jobs:
+  publish-image:
+    name: Publish nightly snapshot
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prep - check out code
+        uses: actions/checkout@v4
+
+      - name: Prep - Set up env vars
+        run: |
+          echo "GO111MODULE=on" >> $GITHUB_ENV
+          echo "GO_VERSION=v$(sed -n 's/GO_VERSION=//p' config.base.env | tr -d '\n' | tr -d '"')" >> $GITHUB_ENV
+          echo "HELM_VERSION=v$(sed -n 's/HELM_VERSION=//p' config.base.env | tr -d '\n' | tr -d '"')" >> $GITHUB_ENV
+          echo "KIND_CLUSTER_NAME=$(sed -n 's/KIND_CLUSTER_NAME=//p' config.base.env | tr -d '\n' | tr -d '"')" >> $GITHUB_ENV
+          echo "GOPATH=/home/runner/go" >> $GITHUB_ENV
+
+      - name: Prep - setup Bats and bats libs
+        if: ${{ github.event.inputs.skipTests != 'true' }}
+        uses: bats-core/bats-action@2.0.0
+        with:
+          support-path: "${{ github.workspace }}/.bats/bats-support"
+          assert-path: "${{ github.workspace }}/.bats/bats-assert"
+          detik-path: "${{ github.workspace }}/.bats/bats-detik"
+          file-path: "${{ github.workspace }}/.bats/bats-file"
+
+      - name: Prep - go environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Prep - Ensure Golang runtime dependencies
+        run: make go-dependencies
+
+      - name: Test - verify code formatting
+        run: make verify
+
+      - name: Prep - Minikube setup
+        if: ${{ github.event.inputs.skipTests != 'true' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install socat
+          sudo mkdir -p $HOME/.kube
+          sudo chown -R $USER $HOME/.kube
+
+      - name: Prep - Kind setup
+        if: ${{ github.event.inputs.skipTests != 'true' }}
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: ${{env.KIND_CLUSTER_NAME}}
+          config: kind-cluster.yaml
+
+      - name: Test - e2e
+        if: ${{ github.event.inputs.skipTests != 'true' }}
+        run: make e2e E2E_TEST_ARGS='-ginkgo.v'
+
+      - name: Test - Helm Chart
+        if: ${{ github.event.inputs.skipTests != 'true' }}
+        run: |
+          git reset --hard
+          make helm-lint
+          make helm-e2e E2E_TEST_ARGS='-ginkgo.v'
+
+      - name: Test - bats
+        env:
+          BATS_LIB_PATH: "${{ github.workspace }}/.bats"
+        if: ${{ github.event.inputs.skipTests != 'true' }}
+        run: make bats-tests
+
+      - name: Post - Login to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAYIO_USERNAME }}
+          password: ${{ secrets.QUAYIO_TOKEN }}
+
+      - name: Post - Push image
+        run: |
+          git reset --hard
+          make container-runtime-snapshot-push

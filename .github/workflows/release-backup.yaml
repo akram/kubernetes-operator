@@ -1,0 +1,60 @@
+name: Release Backup Pvc
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [edited, opened, reopened, synchronize]
+    paths:
+      - 'backup/pvc/**'
+
+  push:
+    branches:
+      - master
+      - main
+    tags: ["*"]
+    paths:
+      - 'backup/pvc/**'
+
+jobs:
+  build-and-release-backup:
+    name: Release Backup Pvc, build, bump and push new image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check envs
+        run: make -C backup/pvc check-env
+
+      - name: Build the e2e image
+        run: make -C backup/pvc docker-build-e2e
+
+      - name: Run the e2e tests
+        run: make -C backup/pvc docker-e2e
+
+      - name: Configure Git
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Bump the version
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          make -C backup/pvc sembump
+          make -C backup/pvc bump-version
+
+      - name: Login to Quay.io
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAYIO_USERNAME }}
+          password: ${{ secrets.QUAYIO_TOKEN }}
+
+      - name: Build and push the image to Quay.io
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        run: |
+          git reset --hard
+          make -C backup/pvc docker-build
+          make -C backup/pvc docker-release

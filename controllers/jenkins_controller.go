@@ -111,8 +111,20 @@ func (r *JenkinsReconciler) newJenkinsReconcilier(jenkins *v1alpha2.Jenkins) con
 // +kubebuilder:rbac:groups=jenkins.io,resources=jenkins/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=jenkins.io,resources=jenkins/finalizers,verbs=update
 // +kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
-// +kubebuilder:rbac:groups=v1,resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=services;configmaps;secrets,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=apps,resources=deployments;daemonsets;replicasets;statefulsets,verbs=*
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=core,resources=pods/portforward,verbs=create
+// +kubebuilder:rbac:groups=core,resources=pods/log,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=pods;pods/exec,verbs=*
+// +kubebuilder:rbac:groups=core,resources=events,verbs=get;watch;list;create;patch
+// +kubebuilder:rbac:groups=apps;jenkins-operator,resources=deployments/finalizers,verbs=update
+// +kubebuilder:rbac:groups=jenkins.io,resources=*,verbs=*
+// +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch
+// +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update
+// +kubebuilder:rbac:groups=image.openshift.io,resources=imagestreams,verbs=get;list;watch
+// +kubebuilder:rbac:groups=build.openshift.io,resources=builds;buildconfigs,verbs=get;list;watch
 
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.7.0/pkg/reconcile
@@ -366,6 +378,11 @@ func (r *JenkinsReconciler) setDefaults(jenkins *v1alpha2.Jenkins) (requeue bool
 		changed = true
 		jenkinsContainer.LivenessProbe = resources.NewProbe(containerProbeURI, containerProbePortName, corev1.URISchemeHTTP, 80, 5, 12)
 	}
+	if jenkinsContainer.Lifecycle == nil {
+		logger.Info("Setting default Jenkins lifecycle")
+		changed = true
+		jenkinsContainer.Lifecycle = &corev1.Lifecycle{}
+	}
 	if len(jenkinsContainer.Command) == 0 {
 		logger.Info("Setting default Jenkins container command")
 		changed = true
@@ -376,7 +393,7 @@ func (r *JenkinsReconciler) setDefaults(jenkins *v1alpha2.Jenkins) (requeue bool
 		changed = true
 		jenkinsContainer.Env = append(jenkinsContainer.Env, corev1.EnvVar{
 			Name:  constants.JavaOpsVariableName,
-			Value: "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:MaxRAMFraction=1 -Djenkins.install.runSetupWizard=false -Djava.awt.headless=true",
+			Value: "-XX:MinRAMPercentage=50.0 -XX:MaxRAMPercentage=80.0 -Djenkins.install.runSetupWizard=false -Djava.awt.headless=true",
 		})
 	}
 	if len(jenkins.Spec.Master.BasePlugins) == 0 {

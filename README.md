@@ -1,11 +1,16 @@
 # Jenkins Operator
 
-[![Version](https://img.shields.io/badge/version-v0.5.0-brightgreen.svg)](https://github.com/jenkinsci/kubernetes-operator/releases/tag/v0.5.0)
-[![Build Status](https://travis-ci.org/jenkinsci/kubernetes-operator.svg?branch=master)](https://travis-ci.org/jenkinsci/kubernetes-operator)
+[![Version](https://img.shields.io/badge/version-v0.8.0-brightgreen.svg)](https://github.com/jenkinsci/kubernetes-operator/releases/tag/v0.8.0)
+[![Build status](https://github.com/jenkinsci/kubernetes-operator/actions/workflows/auto-tests-e2e.yaml/badge.svg)](https://github.com/jenkinsci/kubernetes-operator/actions/workflows/auto-tests-e2e.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/jenkinsci/kubernetes-operator "Go Report Card")](https://goreportcard.com/report/github.com/jenkinsci/kubernetes-operator)
-[![Docker Pulls](https://img.shields.io/docker/pulls/virtuslab/jenkins-operator.svg)](https://hub.docker.com/r/virtuslab/jenkins-operator/tags)
+[![Gitter chat](https://badges.gitter.im/jenkinsci/kubernetes-operator.png)](https://gitter.im/jenkinsci/kubernetes-operator)
 
-![logo](/assets/jenkins_gopher_wide.png)
+<a href="">
+  <picture>
+     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jenkinsci/kubernetes-operator/master/assets/jenkins_gopher_wide_exp_dark.png">
+     <img src="https://raw.githubusercontent.com/jenkinsci/kubernetes-operator/master/assets/jenkins_gopher_wide_exp.png">
+  </picture>
+</a>
 
 ## What's the Jenkins Operator?
 
@@ -36,11 +41,10 @@ The main reason why we decided to implement the **Jenkins Operator** is the fact
 We want to make Jenkins more robust, suitable for dynamic and multi-tenant environments.
 
 Some of the problems we want to solve:
-- [installing plugins with incompatible versions or security vulnerabilities](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/customization/#install-plugins)
-- [better configuration as code](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/customization/)
+- [installing plugins with incompatible versions or security vulnerabilities](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/customizing-jenkins/#install-plugins/)
+- [better configuration as code](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/customizing-jenkins/)
 - [security and hardening out of the box](https://jenkinsci.github.io/kubernetes-operator/docs/security/)
-- [make errors more visible for end users](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/diagnostics/)
-- [backup and restore for jobs history](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/configure-backup-and-restore/)
+- [make errors more visible for end users](https://jenkinsci.github.io/kubernetes-operator/docs/troubleshooting/)
 - orphaned jobs with no JNLP connection
 - handle graceful shutdown properly
 - proper end to end tests for Jenkins lifecycle
@@ -50,25 +54,38 @@ Some of the problems we want to solve:
 Go to [**our documentation website**](https://jenkinsci.github.io/kubernetes-operator/) for more information.
 
 Selected content:
-1. [Installation](https://jenkinsci.github.io/kubernetes-operator/docs/installation/)
+1. [How it works](https://jenkinsci.github.io/kubernetes-operator/docs/how-it-works/)
 2. [Getting Started](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/)
-3. [How it works](https://jenkinsci.github.io/kubernetes-operator/docs/how-it-works/)
-4. [Security](https://jenkinsci.github.io/kubernetes-operator/docs/security/)
+3. [Security](https://jenkinsci.github.io/kubernetes-operator/docs/security/)
+4. [Troubleshooting](https://jenkinsci.github.io/kubernetes-operator/docs/troubleshooting/)
 5. [Developer Guide](https://jenkinsci.github.io/kubernetes-operator/docs/developer-guide/)
-5. [Jenkins Custom Resource Definition Schema](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/schema/)
+6. [FAQ](https://jenkinsci.github.io/kubernetes-operator/docs/faq/)
+7. [Jenkins Custom Resource Definition Schema](https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/schema/)
 
 ## Common Issues and Workarounds
 
 - Multibranch Pipelines and Backup Issues: https://github.com/jenkinsci/kubernetes-operator/issues/104#issuecomment-554289768
 
 ## Community
+Main channel of communication on topics related to Jenkins Operator is [Jenkins Operator Category](https://community.jenkins.io/c/contributing/jenkins-operator/20) on [Jenkins Community Discourse](https://community.jenkins.io/).
 
-We have a dedicated channel called `#jenkins-operator` on [virtuslab-oss.slack.com](https://virtuslab-oss.slack.com)
-Fill out ([Invite form](https://forms.gle/X3X8qA1XMirdBuEH7)) and come say hi !
+Here you can ask questions about the project, discuss best practices on using it, and talk to other users of the Operator, contributors and project's maintainers.
+
+We also have a [gitter](https://gitter.im/jenkinsci/kubernetes-operator)/[matrix](https://matrix.to/#/#jenkinsci_kubernetes-operator:gitter.im) channel, come to say hi!
+
+## Snapshots between releases
+
+We are trying our best to resolve issues quickly, but they have to wait to be released. If you can't wait for an official
+docker image release and acknowledge the risk, you can use our unofficial images, which are built nightly.
+
+You can find the project's Quay.io repository [here](https://quay.io/organization/jenkins-kubernetes-operator).
+
+Look for the images with tag "{git-hash}", where {git-hash} is the hash of the master commit that interests you.
 
 ## Contribution
 
-Feel free to file [issues](https://github.com/jenkinsci/kubernetes-operator/issues) or [pull requests](https://github.com/jenkinsci/kubernetes-operator/pulls).
+Feel free to file [issues](https://github.com/jenkinsci/kubernetes-operator/issues) or [pull requests](https://github.com/jenkinsci/kubernetes-operator/pulls),
+but please consult [CONTRIBUTING](https://github.com/jenkinsci/kubernetes-operator/blob/master/CONTRIBUTING.md) document beforehand.
 
 Before any big pull request please consult the maintainers to ensure a common direction.
 
@@ -76,6 +93,7 @@ Before any big pull request please consult the maintainers to ensure a common di
 
 - [Jenkins World 2019 Lisbon](assets/Jenkins_World_Lisbon_2019%20-Jenkins_Kubernetes_Operator.pdf)
 - [Jenkins Online Meetup 2020](assets/Jenkins_Online_Meetup-Jenkins_Kubernetes_Operator.pdf)
+- [Jenkins Online Meetup 2021](https://www.youtube.com/watch?v=BsYYVkophsk)
 
 ## About the authors
 

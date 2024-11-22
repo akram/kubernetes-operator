@@ -15,6 +15,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,7 +32,7 @@ const (
 func getJenkins(namespace, name string) *v1alpha2.Jenkins {
 	jenkins := &v1alpha2.Jenkins{}
 	namespaceName := types.NamespacedName{Namespace: namespace, Name: name}
-	Expect(k8sClient.Get(context.TODO(), namespaceName, jenkins)).Should(Succeed())
+	Expect(K8sClient.Get(context.TODO(), namespaceName, jenkins)).Should(Succeed())
 	return jenkins
 }
 
@@ -41,115 +42,9 @@ func getJenkinsMasterPod(jenkins *v1alpha2.Jenkins) *corev1.Pod {
 		Namespace:     jenkins.Namespace,
 	}
 	pods := &corev1.PodList{}
-	Expect(k8sClient.List(context.TODO(), pods, lo)).Should(Succeed())
+	Expect(K8sClient.List(context.TODO(), pods, lo)).Should(Succeed())
 	Expect(pods.Items).Should(HaveLen(1), fmt.Sprintf("Jenkins pod not found, pod list: %+v", pods.Items))
 	return &pods.Items[0]
-}
-
-func createJenkinsCR(name, namespace string, seedJob *[]v1alpha2.SeedJob, groovyScripts v1alpha2.GroovyScripts, casc v1alpha2.ConfigurationAsCode, priorityClassName string) *v1alpha2.Jenkins {
-	var seedJobs []v1alpha2.SeedJob
-	if seedJob != nil {
-		seedJobs = append(seedJobs, *seedJob...)
-	}
-
-	jenkins := &v1alpha2.Jenkins{
-		TypeMeta: v1alpha2.JenkinsTypeMeta(),
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: v1alpha2.JenkinsSpec{
-			GroovyScripts:       groovyScripts,
-			ConfigurationAsCode: casc,
-			Master: v1alpha2.JenkinsMaster{
-				Annotations: map[string]string{"test": "label"},
-				Containers: []v1alpha2.Container{
-					{
-						Name: resources.JenkinsMasterContainerName,
-						Env: []corev1.EnvVar{
-							{
-								Name:  "TEST_ENV",
-								Value: "test_env_value",
-							},
-						},
-						ReadinessProbe: &corev1.Probe{
-							Handler: corev1.Handler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/login",
-									Port:   intstr.FromString("http"),
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: int32(100),
-							TimeoutSeconds:      int32(4),
-							FailureThreshold:    int32(12),
-							SuccessThreshold:    int32(1),
-							PeriodSeconds:       int32(1),
-						},
-						LivenessProbe: &corev1.Probe{
-							Handler: corev1.Handler{
-								HTTPGet: &corev1.HTTPGetAction{
-									Path:   "/login",
-									Port:   intstr.FromString("http"),
-									Scheme: corev1.URISchemeHTTP,
-								},
-							},
-							InitialDelaySeconds: int32(80),
-							TimeoutSeconds:      int32(4),
-							FailureThreshold:    int32(10),
-							SuccessThreshold:    int32(1),
-							PeriodSeconds:       int32(1),
-						},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "plugins-cache",
-								MountPath: "/usr/share/jenkins/ref/plugins",
-							},
-						},
-					},
-					{
-						Name:  "envoyproxy",
-						Image: "envoyproxy/envoy-alpine:v1.14.1",
-					},
-				},
-				Plugins: []v1alpha2.Plugin{
-					{Name: "audit-trail", Version: "3.7"},
-					{Name: "simple-theme-plugin", Version: "0.6"},
-					{Name: "github", Version: "1.32.0"},
-					{Name: "devoptics", Version: "1.1934", DownloadURL: "https://jenkins-updates.cloudbees.com/download/plugins/devoptics/1.1934/devoptics.hpi"},
-				},
-				PriorityClassName: priorityClassName,
-				NodeSelector:      map[string]string{"kubernetes.io/os": "linux"},
-				Volumes: []corev1.Volume{
-					{
-						Name: "plugins-cache",
-						VolumeSource: corev1.VolumeSource{
-							EmptyDir: &corev1.EmptyDirVolumeSource{},
-						},
-					},
-				},
-			},
-			SeedJobs: seedJobs,
-			Service: v1alpha2.Service{
-				Type: corev1.ServiceTypeNodePort,
-				Port: constants.DefaultHTTPPortInt32,
-			},
-		},
-	}
-	jenkins.Spec.Roles = []rbacv1.RoleRef{
-		{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "Role",
-			Name:     resources.GetResourceName(jenkins),
-		},
-	}
-	updateJenkinsCR(jenkins)
-
-	_, _ = fmt.Fprintf(GinkgoWriter, "Jenkins CR %+v\n", *jenkins)
-
-	Expect(k8sClient.Create(context.TODO(), jenkins)).Should(Succeed())
-
-	return jenkins
 }
 
 func createJenkinsCRSafeRestart(name, namespace string, seedJob *[]v1alpha2.SeedJob, groovyScripts v1alpha2.GroovyScripts, casc v1alpha2.ConfigurationAsCode, priorityClassName string) *v1alpha2.Jenkins {
@@ -171,7 +66,8 @@ func createJenkinsCRSafeRestart(name, namespace string, seedJob *[]v1alpha2.Seed
 				Annotations: map[string]string{"test": "label"},
 				Containers: []v1alpha2.Container{
 					{
-						Name: resources.JenkinsMasterContainerName,
+						Name:  resources.JenkinsMasterContainerName,
+						Image: JenkinsTestImage,
 						Env: []corev1.EnvVar{
 							{
 								Name:  "TEST_ENV",
@@ -206,6 +102,16 @@ func createJenkinsCRSafeRestart(name, namespace string, seedJob *[]v1alpha2.Seed
 							SuccessThreshold:    int32(1),
 							PeriodSeconds:       int32(5),
 						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("250m"),
+								corev1.ResourceMemory: resource.MustParse("500Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1000m"),
+								corev1.ResourceMemory: resource.MustParse("3Gi"),
+							},
+						},
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "plugins-cache",
@@ -219,10 +125,10 @@ func createJenkinsCRSafeRestart(name, namespace string, seedJob *[]v1alpha2.Seed
 					},
 				},
 				Plugins: []v1alpha2.Plugin{
-					{Name: "audit-trail", Version: "3.7"},
-					{Name: "simple-theme-plugin", Version: "0.6"},
-					{Name: "github", Version: "1.32.0"},
-					{Name: "devoptics", Version: "1.1934", DownloadURL: "https://jenkins-updates.cloudbees.com/download/plugins/devoptics/1.1934/devoptics.hpi"},
+					{Name: "audit-trail", Version: "361.v82cde86c784e"},
+					{Name: "simple-theme-plugin", Version: "176.v39740c03a_a_f5"},
+					{Name: "github", Version: "1.38.0"},
+					{Name: "devoptics", Version: "2.0", DownloadURL: "https://jenkins-updates.cloudbees.com/download/plugins/devoptics/2.0/devoptics.hpi"},
 				},
 				PriorityClassName: priorityClassName,
 				NodeSelector:      map[string]string{"kubernetes.io/os": "linux"},
@@ -237,8 +143,9 @@ func createJenkinsCRSafeRestart(name, namespace string, seedJob *[]v1alpha2.Seed
 			},
 			SeedJobs: seedJobs,
 			Service: v1alpha2.Service{
-				Type: corev1.ServiceTypeNodePort,
-				Port: constants.DefaultHTTPPortInt32,
+				Type:     corev1.ServiceTypeNodePort,
+				Port:     constants.DefaultHTTPPortInt32,
+				NodePort: 30303,
 			},
 		},
 	}
@@ -253,7 +160,7 @@ func createJenkinsCRSafeRestart(name, namespace string, seedJob *[]v1alpha2.Seed
 
 	_, _ = fmt.Fprintf(GinkgoWriter, "Jenkins CR %+v\n", *jenkins)
 
-	Expect(k8sClient.Create(context.TODO(), jenkins)).Should(Succeed())
+	Expect(K8sClient.Create(context.TODO(), jenkins)).Should(Succeed())
 
 	return jenkins
 }
@@ -261,11 +168,11 @@ func createJenkinsCRSafeRestart(name, namespace string, seedJob *[]v1alpha2.Seed
 func createJenkinsAPIClientFromServiceAccount(jenkins *v1alpha2.Jenkins, jenkinsAPIURL string) (jenkinsclient.Jenkins, error) {
 	podName := resources.GetJenkinsMasterPodName(jenkins)
 
-	clientSet, err := kubernetes.NewForConfig(cfg)
+	clientSet, err := kubernetes.NewForConfig(Cfg)
 	if err != nil {
 		return nil, err
 	}
-	config := configuration.Configuration{Jenkins: jenkins, ClientSet: *clientSet, Config: cfg}
+	config := configuration.Configuration{Jenkins: jenkins, ClientSet: *clientSet, Config: Cfg}
 	r := base.New(config, jenkinsclient.JenkinsAPIConnectionSettings{})
 
 	token, _, err := r.Configuration.Exec(podName, resources.JenkinsMasterContainerName, []string{"cat", "/var/run/secrets/kubernetes.io/serviceaccount/token"})
@@ -281,7 +188,7 @@ func createJenkinsAPIClientFromSecret(jenkins *v1alpha2.Jenkins, jenkinsAPIURL s
 
 	adminSecret := &corev1.Secret{}
 	namespaceName := types.NamespacedName{Namespace: jenkins.Namespace, Name: resources.GetOperatorCredentialsSecretName(jenkins)}
-	if err := k8sClient.Get(context.TODO(), namespaceName, adminSecret); err != nil {
+	if err := K8sClient.Get(context.TODO(), namespaceName, adminSecret); err != nil {
 		return nil, err
 	}
 
@@ -296,7 +203,7 @@ func verifyJenkinsAPIConnection(jenkins *v1alpha2.Jenkins, namespace string) (je
 	By("establishing Jenkins API connection")
 
 	var service corev1.Service
-	err := k8sClient.Get(context.TODO(), types.NamespacedName{
+	err := K8sClient.Get(context.TODO(), types.NamespacedName{
 		Namespace: jenkins.Namespace,
 		Name:      resources.GetJenkinsHTTPServiceName(jenkins),
 	}, &service)
@@ -333,12 +240,15 @@ func verifyJenkinsAPIConnection(jenkins *v1alpha2.Jenkins, namespace string) (je
 func restartJenkinsMasterPod(jenkins *v1alpha2.Jenkins) {
 	_, _ = fmt.Fprintf(GinkgoWriter, "Restarting Jenkins master pod\n")
 	jenkinsPod := getJenkinsMasterPod(jenkins)
-	Expect(k8sClient.Delete(context.TODO(), jenkinsPod)).Should(Succeed())
+	initialCreationTimestamp := jenkinsPod.CreationTimestamp.DeepCopy()
+
+	_, _ = fmt.Fprintf(GinkgoWriter, "Jenkins pod: %+v\n", jenkinsPod.Status.Phase)
+	Expect(K8sClient.Delete(context.TODO(), jenkinsPod)).Should(Succeed())
 
 	Eventually(func() (bool, error) {
 		jenkinsPod = getJenkinsMasterPod(jenkins)
-		return jenkinsPod.DeletionTimestamp != nil, nil
-	}, 30*retryInterval, retryInterval).Should(BeTrue())
+		return !jenkinsPod.CreationTimestamp.Equal(initialCreationTimestamp), nil
+	}, 45*retryInterval, retryInterval).Should(BeTrue())
 
 	_, _ = fmt.Fprintf(GinkgoWriter, "Jenkins master pod has been restarted\n")
 }
@@ -346,7 +256,7 @@ func restartJenkinsMasterPod(jenkins *v1alpha2.Jenkins) {
 func getJenkinsService(jenkins *v1alpha2.Jenkins, serviceKind string) *corev1.Service {
 	service := &corev1.Service{}
 	serviceName := constants.OperatorName + "-" + serviceKind + "-" + jenkins.ObjectMeta.Name
-	Expect(k8sClient.Get(context.TODO(), client.ObjectKey{Name: serviceName, Namespace: jenkins.Namespace}, service)).Should(Succeed())
+	Expect(K8sClient.Get(context.TODO(), client.ObjectKey{Name: serviceName, Namespace: jenkins.Namespace}, service)).Should(Succeed())
 
 	return service
 }

@@ -1,11 +1,13 @@
 package e2e
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jenkinsci/kubernetes-operator/api/v1alpha2"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	// +kubebuilder:scaffold:imports
 )
@@ -73,28 +75,29 @@ var _ = Describe("Jenkins controller configuration", func() {
 	)
 
 	BeforeEach(func() {
-		namespace = createNamespace()
-
+		namespace = CreateNamespace()
 		createUserConfigurationSecret(namespace.Name, userConfigurationSecretData)
 		createUserConfigurationConfigMap(namespace.Name, numberOfExecutorsEnvName, fmt.Sprintf("${%s}", systemMessageEnvName))
-		jenkins = createJenkinsCR(jenkinsCRName, namespace.Name, &[]v1alpha2.SeedJob{mySeedJob.SeedJob}, groovyScripts, casc, priorityClassName)
+		jenkins = RenderJenkinsCR(jenkinsCRName, namespace.Name, &[]v1alpha2.SeedJob{mySeedJob.SeedJob}, groovyScripts, casc, priorityClassName)
+		Expect(K8sClient.Create(context.TODO(), jenkins)).Should(Succeed())
 		createDefaultLimitsForContainersInNamespace(namespace.Name)
 		createKubernetesCredentialsProviderSecret(namespace.Name, mySeedJob)
 	})
 
 	AfterEach(func() {
-		destroyNamespace(namespace)
+		ShowLogsIfTestHasFailed(CurrentGinkgoTestDescription().Failed, namespace.Name)
+		DestroyNamespace(namespace)
 	})
 
 	Context("when deploying CR to cluster", func() {
-		It("creates Jenkins instance and configures it", func() {
-			waitForJenkinsBaseConfigurationToComplete(jenkins)
+		It("creates vanilla Jenkins instance and configures it", func() {
+			WaitForJenkinsBaseConfigurationToComplete(jenkins)
 			verifyJenkinsMasterPodAttributes(jenkins)
 			verifyServices(jenkins)
 			jenkinsClient, cleanUpFunc := verifyJenkinsAPIConnection(jenkins, namespace.Name)
 			defer cleanUpFunc()
 			verifyPlugins(jenkinsClient, jenkins)
-			waitForJenkinsUserConfigurationToComplete(jenkins)
+			WaitForJenkinsUserConfigurationToComplete(jenkins)
 			verifyUserConfiguration(jenkinsClient, numberOfExecutors, systemMessage)
 			verifyJenkinsSeedJobs(jenkinsClient, []seedJobConfig{mySeedJob})
 		})
@@ -124,17 +127,19 @@ var _ = Describe("Jenkins controller priority class", func() {
 	)
 
 	BeforeEach(func() {
-		namespace = createNamespace()
-		jenkins = createJenkinsCR(jenkinsCRName, namespace.Name, nil, groovyScripts, casc, priorityClassName)
+		namespace = CreateNamespace()
+		jenkins = RenderJenkinsCR(jenkinsCRName, namespace.Name, nil, groovyScripts, casc, priorityClassName)
+		Expect(K8sClient.Create(context.TODO(), jenkins)).Should(Succeed())
 	})
 
 	AfterEach(func() {
-		destroyNamespace(namespace)
+		ShowLogsIfTestHasFailed(CurrentGinkgoTestDescription().Failed, namespace.Name)
+		DestroyNamespace(namespace)
 	})
 
 	Context("when deploying CR with priority class to cluster", func() {
-		It("creates Jenkins instance and configures it", func() {
-			waitForJenkinsBaseConfigurationToComplete(jenkins)
+		It("creates Jenkins instance with priority class and configures it", func() {
+			WaitForJenkinsBaseConfigurationToComplete(jenkins)
 			verifyJenkinsMasterPodAttributes(jenkins)
 		})
 	})
@@ -175,17 +180,19 @@ var _ = Describe("Jenkins controller plugins test", func() {
 	)
 
 	BeforeEach(func() {
-		namespace = createNamespace()
-		jenkins = createJenkinsCR(jenkinsCRName, namespace.Name, &[]v1alpha2.SeedJob{mySeedJob.SeedJob}, groovyScripts, casc, priorityClassName)
+		namespace = CreateNamespace()
+		jenkins = RenderJenkinsCR(jenkinsCRName, namespace.Name, &[]v1alpha2.SeedJob{mySeedJob.SeedJob}, groovyScripts, casc, priorityClassName)
+		Expect(K8sClient.Create(context.TODO(), jenkins)).Should(Succeed())
 	})
 
 	AfterEach(func() {
-		destroyNamespace(namespace)
+		ShowLogsIfTestHasFailed(CurrentGinkgoTestDescription().Failed, namespace.Name)
+		DestroyNamespace(namespace)
 	})
 
 	Context("when deploying CR with a SeedJob to cluster", func() {
 		It("runs kubernetes plugin job successfully", func() {
-			waitForJenkinsUserConfigurationToComplete(jenkins)
+			WaitForJenkinsUserConfigurationToComplete(jenkins)
 			jenkinsClient, cleanUpFunc := verifyJenkinsAPIConnection(jenkins, namespace.Name)
 			defer cleanUpFunc()
 			waitForJobCreation(jenkinsClient, jobID)

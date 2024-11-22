@@ -27,7 +27,7 @@ type portForwardToPodRequest struct {
 	localPort int
 	// podPort is the target port for the pod
 	podPort int
-	// Steams configures where to write or read input from
+	// Streams configures where to write or read input from
 	streams genericclioptions.IOStreams
 	// stopCh is the channel used to manage the port forward lifecycle
 	stopCh <-chan struct{}
@@ -66,7 +66,7 @@ func setupPortForwardToPod(namespace, podName string, podPort int) (port int, cl
 	readyCh := make(chan struct{})
 
 	req := portForwardToPodRequest{
-		config: cfg,
+		config: Cfg,
 		pod: v1.Pod{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      podName,

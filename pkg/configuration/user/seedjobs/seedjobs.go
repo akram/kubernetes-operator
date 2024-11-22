@@ -36,12 +36,17 @@ const (
 	// PrivateKeySecretKey is private key data key in Kubernetes secret used to create Jenkins SSH credential
 	PrivateKeySecretKey = "privateKey"
 
+	AppIDSecretKey = "appId"
+
 	// JenkinsCredentialTypeLabelName is label for kubernetes-credentials-provider-plugin which determine Jenkins
 	// credential type
 	JenkinsCredentialTypeLabelName = "jenkins.io/credentials-type"
 
 	// AgentName is the name of seed job agent
 	AgentName = "seed-job-agent"
+
+	// DefaultAgentImage is the default image used for the seed-job agent
+	defaultAgentImage = "jenkins/inbound-agent:3248.v65ecb_254c298-6"
 
 	creatingGroovyScriptName = "seed-job-groovy-script.groovy"
 
@@ -80,6 +85,7 @@ import hudson.plugins.git.BranchSpec;
 import hudson.plugins.git.GitSCM;
 import hudson.plugins.git.SubmoduleConfig;
 import hudson.plugins.git.extensions.impl.CloneOption;
+import hudson.plugins.git.extensions.impl.GitLFSPull;
 import javaposse.jobdsl.plugin.ExecuteDslScripts;
 import javaposse.jobdsl.plugin.LookupStrategy;
 import javaposse.jobdsl.plugin.RemovedJobAction;
@@ -93,7 +99,10 @@ def jobDslSeedName = "{{ .ID }}-{{ .SeedJobSuffix }}";
 def jobRef = jenkins.getItem(jobDslSeedName)
 
 def repoList = GitSCM.createRepoList("{{ .RepositoryURL }}", "{{ .CredentialID }}")
-def gitExtensions = [new CloneOption(true, true, ";", 10)]
+def gitExtensions = [
+	new CloneOption(true, true, ";", 10),
+	new GitLFSPull()
+]
 def scm = new GitSCM(
         repoList,
         newArrayList(new BranchSpec("{{ .RepositoryBranch }}")),
@@ -154,7 +163,6 @@ type SeedJobs interface {
 	isRecreatePodNeeded(jenkins v1alpha2.Jenkins) bool
 	createAgent(jenkinsClient jenkinsclient.Jenkins, k8sClient client.Client, jenkinsManifest *v1alpha2.Jenkins, namespace string, agentName string) error
 	ValidateSeedJobs(jenkins v1alpha2.Jenkins) ([]string, error)
-	validateSchedule(job v1alpha2.SeedJob, str string, key string) []string
 	validateGitHubPushTrigger(jenkins v1alpha2.Jenkins) []string
 	validateBitbucketPushTrigger(jenkins v1alpha2.Jenkins) []string
 	validateIfIDIsUnique(seedJobs []v1alpha2.SeedJob) []string
@@ -401,13 +409,14 @@ func agentDeploymentName(jenkins v1alpha2.Jenkins, agentName string) string {
 }
 
 func agentDeployment(jenkins *v1alpha2.Jenkins, namespace string, agentName string, secret string, kubernetesDomainName string) (*appsv1.Deployment, error) {
-	jenkinsSlavesServiceFQDN, err := resources.GetJenkinsSlavesServiceFQDN(jenkins, kubernetesDomainName)
-	if err != nil {
-		return nil, err
-	}
 	jenkinsHTTPServiceFQDN, err := resources.GetJenkinsHTTPServiceFQDN(jenkins, kubernetesDomainName)
 	if err != nil {
 		return nil, err
+	}
+
+	agentImage := jenkins.Spec.SeedJobAgentImage
+	if jenkins.Spec.SeedJobAgentImage == "" {
+		agentImage = defaultAgentImage
 	}
 
 	suffix := ""
@@ -435,16 +444,15 @@ func agentDeployment(jenkins *v1alpha2.Jenkins, namespace string, agentName stri
 					NodeSelector:     jenkins.Spec.Master.NodeSelector,
 					Tolerations:      jenkins.Spec.Master.Tolerations,
 					ImagePullSecrets: jenkins.Spec.Master.ImagePullSecrets,
+					HostAliases:      jenkins.Spec.Master.HostAliases,
 					Containers: []corev1.Container{
 						{
 							Name:  "jnlp",
-							Image: "jenkins/inbound-agent:alpine",
+							Image: agentImage,
 							Env: []corev1.EnvVar{
 								{
-									Name: "JENKINS_TUNNEL",
-									Value: fmt.Sprintf("%s:%d",
-										jenkinsSlavesServiceFQDN,
-										jenkins.Spec.SlaveService.Port),
+									Name:  "JENKINS_WEB_SOCKET",
+									Value: "true",
 								},
 								{
 									Name:  "JENKINS_SECRET",

@@ -1,3 +1,4 @@
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -6,35 +7,85 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - ""
-  resources:
-  - services
-  - configmaps
-  - secrets
-  - serviceaccounts
-  verbs:
-  - get
-  - create
-  - update
-  - list
-  - watch
-- apiGroups:
   - apps
   resources:
-  - deployments
   - daemonsets
+  - deployments
   - replicasets
   - statefulsets
   verbs:
-    - '*'
+  - '*'
 - apiGroups:
-    - rbac.authorization.k8s.io
+  - apps
+  - jenkins-operator
   resources:
-  - roles
-  - rolebindings
+  - deployments/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - buildconfigs
+  - builds
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - services
   verbs:
   - create
+  - get
+  - list
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/exec
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
   - list
   - watch
 - apiGroups:
@@ -42,78 +93,75 @@ rules:
   resources:
   - pods/portforward
   verbs:
-    - create
+  - create
 - apiGroups:
-    - ""
+  - ""
   resources:
-    - pods/log
+  - serviceaccounts
   verbs:
-    - get
-    - list
-    - watch
+  - create
+  - get
+  - list
+  - update
+  - watch
 - apiGroups:
-    - ""
+  - image.openshift.io
   resources:
-    - pods
-    - pods/exec
+  - imagestreams
   verbs:
-    - "*"
+  - get
+  - list
+  - watch
 - apiGroups:
-    - ""
+  - jenkins.io
   resources:
-    - events
+  - '*'
   verbs:
-    - get
-    - watch
-    - list
-    - create
-    - patch
+  - '*'
 - apiGroups:
-    - apps
-  resourceNames:
-    - jenkins-operator
+  - jenkins.io
   resources:
-    - deployments/finalizers
+  - jenkins
   verbs:
-    - update
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
-    - jenkins.io
+  - jenkins.io
   resources:
-    - '*'
+  - jenkins/finalizers
   verbs:
-    - '*'
+  - update
 - apiGroups:
-    - ""
+  - jenkins.io
   resources:
-    - persistentvolumeclaims
+  - jenkins/status
   verbs:
-    - get
-    - list
-    - watch
+  - get
+  - patch
+  - update
 - apiGroups:
-    - "route.openshift.io"
+  - rbac.authorization.k8s.io
   resources:
-    - routes
+  - rolebindings
+  - roles
   verbs:
-    - get
-    - list
-    - watch
-    - create
-    - update
+  - create
+  - get
+  - list
+  - update
+  - watch
 - apiGroups:
-    - "image.openshift.io"
+  - route.openshift.io
   resources:
-    - imagestreams
+  - routes
   verbs:
-    - get
-    - list
-    - watch
-- apiGroups:
-    - "build.openshift.io"
-  resources:
-    - builds
-    - buildconfigs
-  verbs:
-    - get
-    - list
-    - watch
+  - create
+  - get
+  - list
+  - update
+  - watch

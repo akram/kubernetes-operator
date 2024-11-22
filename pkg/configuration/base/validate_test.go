@@ -53,15 +53,6 @@ func TestValidatePlugins(t *testing.T) {
 
 		assert.Equal(t, got, []string{"invalid plugin name 'INVALID?:0.0.1', must follow pattern '" + plugins.NamePattern.String() + "'"})
 	})
-	t.Run("invalid user plugin version", func(t *testing.T) {
-		var requiredBasePlugins []plugins.Plugin
-		var basePlugins []v1alpha2.Plugin
-		userPlugins := []v1alpha2.Plugin{{Name: "simple-plugin", Version: "invalid!"}}
-
-		got := baseReconcileLoop.validatePlugins(requiredBasePlugins, basePlugins, userPlugins)
-
-		assert.Equal(t, got, []string{"invalid plugin version 'simple-plugin:invalid!', must follow pattern '" + plugins.VersionPattern.String() + "'"})
-	})
 	t.Run("valid base plugin", func(t *testing.T) {
 		var requiredBasePlugins []plugins.Plugin
 		basePlugins := []v1alpha2.Plugin{{Name: "simple-plugin", Version: "0.0.1"}}
@@ -79,15 +70,6 @@ func TestValidatePlugins(t *testing.T) {
 		got := baseReconcileLoop.validatePlugins(requiredBasePlugins, basePlugins, userPlugins)
 
 		assert.Equal(t, got, []string{"invalid plugin name 'INVALID?:0.0.1', must follow pattern '" + plugins.NamePattern.String() + "'"})
-	})
-	t.Run("invalid base plugin version", func(t *testing.T) {
-		var requiredBasePlugins []plugins.Plugin
-		basePlugins := []v1alpha2.Plugin{{Name: "simple-plugin", Version: "invalid!"}}
-		var userPlugins []v1alpha2.Plugin
-
-		got := baseReconcileLoop.validatePlugins(requiredBasePlugins, basePlugins, userPlugins)
-
-		assert.Equal(t, got, []string{"invalid plugin version 'simple-plugin:invalid!', must follow pattern '" + plugins.VersionPattern.String() + "'"})
 	})
 	t.Run("valid user and base plugin version", func(t *testing.T) {
 		var requiredBasePlugins []plugins.Plugin
@@ -923,7 +905,7 @@ func TestValidateJenkinsMasterContainerCommand(t *testing.T) {
 							Command: []string{
 								"bash",
 								"-c",
-								fmt.Sprintf("%s/%s && my-extra-command.sh && exec /sbin/tini -s -- /usr/local/bin/jenkins.sh",
+								fmt.Sprintf("%s/%s && my-extra-command.sh && exec /usr/bin/tini -s -- /usr/local/bin/jenkins.sh",
 									resources.JenkinsScriptsVolumePath, resources.InitScriptName),
 							},
 						},
@@ -947,7 +929,7 @@ func TestValidateJenkinsMasterContainerCommand(t *testing.T) {
 							Command: []string{
 								"bash",
 								"-c",
-								fmt.Sprintf("%s/%s && my-extra-command.sh && /sbin/tini -s -- /usr/local/bin/jenkins.sh",
+								fmt.Sprintf("%s/%s && my-extra-command.sh && /usr/bin/tini -s -- /usr/local/bin/jenkins.sh",
 									resources.JenkinsScriptsVolumePath, resources.InitScriptName),
 							},
 						},

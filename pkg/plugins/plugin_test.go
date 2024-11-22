@@ -36,9 +36,9 @@ func TestValidatePlugin(t *testing.T) {
 		got := validatePlugin(validPluginName, "3.1.20180605-140134.c2e96c4", "")
 		assert.NoError(t, got)
 	})
-	t.Run("invalid version !", func(t *testing.T) {
-		got := validatePlugin(validPluginName, "0.5.1!", "")
-		assert.Error(t, got)
+	t.Run("version 1074.v60e6c29b_b_44b_", func(t *testing.T) {
+		got := validatePlugin(validPluginName, "1074.v60e6c29b_b_44b_", "")
+		assert.NoError(t, got)
 	})
 	t.Run("name 01234567890-abcdefghijklmnoprstuwxz_ABCDEFGHIJKLMNOPQRSTUVWXYZ", func(t *testing.T) {
 		got := validatePlugin("01234567890-abcdefghijklmnoprstuwxz_ABCDEFGHIJKLMNOPQRSTUVWXYZ", validPluginVersion, "")

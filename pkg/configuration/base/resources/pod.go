@@ -53,7 +53,7 @@ func GetJenkinsMasterContainerBaseCommand() []string {
 	return []string{
 		"bash",
 		"-c",
-		fmt.Sprintf("%s/%s && exec /sbin/tini -s -- /usr/local/bin/jenkins.sh",
+		fmt.Sprintf("%s/%s && exec /usr/bin/tini -s -- /usr/local/bin/jenkins.sh",
 			JenkinsScriptsVolumePath, InitScriptName),
 	}
 }
@@ -234,13 +234,16 @@ func NewJenkinsMasterContainer(jenkins *v1alpha2.Jenkins) corev1.Container {
 		envs = append(envs, jenkinsHomeEnvVar)
 	}
 
-	setLivenessAndReadinessPath(jenkins)
+	if jenkins.Spec.Master.Containers[0].ReadinessProbe.HTTPGet != nil {
+		setLivenessAndReadinessPath(jenkins)
+	}
 
 	return corev1.Container{
 		Name:            JenkinsMasterContainerName,
 		Image:           jenkinsContainer.Image,
 		ImagePullPolicy: jenkinsContainer.ImagePullPolicy,
 		Command:         jenkinsContainer.Command,
+		Lifecycle:       jenkinsContainer.Lifecycle,
 		LivenessProbe:   jenkinsContainer.LivenessProbe,
 		ReadinessProbe:  jenkinsContainer.ReadinessProbe,
 		Ports: []corev1.ContainerPort{
@@ -257,6 +260,7 @@ func NewJenkinsMasterContainer(jenkins *v1alpha2.Jenkins) corev1.Container {
 		},
 		SecurityContext: jenkinsContainer.SecurityContext,
 		Env:             envs,
+		EnvFrom:         jenkinsContainer.EnvFrom,
 		Resources:       jenkinsContainer.Resources,
 		VolumeMounts:    append(GetJenkinsMasterContainerBaseVolumeMounts(jenkins), jenkinsContainer.VolumeMounts...),
 	}
@@ -366,19 +370,26 @@ func NewJenkinsMasterPod(objectMeta metav1.ObjectMeta, jenkins *v1alpha2.Jenkins
 	objectMeta.Name = GetJenkinsMasterPodName(jenkins)
 	objectMeta.Labels = GetJenkinsMasterPodLabels(*jenkins)
 
+	if jenkins.Spec.Master.TerminationGracePeriodSeconds == nil {
+		defaultGracePeriod := constants.DefaultTerminationGracePeriodSeconds
+		jenkins.Spec.Master.TerminationGracePeriodSeconds = &defaultGracePeriod
+	}
+
 	return &corev1.Pod{
 		TypeMeta:   buildPodTypeMeta(),
 		ObjectMeta: objectMeta,
 		Spec: corev1.PodSpec{
-			ServiceAccountName: serviceAccountName,
-			RestartPolicy:      corev1.RestartPolicyNever,
-			NodeSelector:       jenkins.Spec.Master.NodeSelector,
-			Containers:         newContainers(jenkins),
-			Volumes:            append(GetJenkinsMasterPodBaseVolumes(jenkins), jenkins.Spec.Master.Volumes...),
-			SecurityContext:    jenkins.Spec.Master.SecurityContext,
-			ImagePullSecrets:   jenkins.Spec.Master.ImagePullSecrets,
-			Tolerations:        jenkins.Spec.Master.Tolerations,
-			PriorityClassName:  jenkins.Spec.Master.PriorityClassName,
+			ServiceAccountName:            serviceAccountName,
+			RestartPolicy:                 corev1.RestartPolicyNever,
+			NodeSelector:                  jenkins.Spec.Master.NodeSelector,
+			Containers:                    newContainers(jenkins),
+			Volumes:                       append(GetJenkinsMasterPodBaseVolumes(jenkins), jenkins.Spec.Master.Volumes...),
+			SecurityContext:               jenkins.Spec.Master.SecurityContext,
+			ImagePullSecrets:              jenkins.Spec.Master.ImagePullSecrets,
+			Tolerations:                   jenkins.Spec.Master.Tolerations,
+			PriorityClassName:             jenkins.Spec.Master.PriorityClassName,
+			HostAliases:                   jenkins.Spec.Master.HostAliases,
+			TerminationGracePeriodSeconds: jenkins.Spec.Master.TerminationGracePeriodSeconds,
 		},
 	}
 }

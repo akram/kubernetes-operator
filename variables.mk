@@ -1,4 +1,4 @@
-SHELL := /bin/bash
+SHELL := /usr/bin/env bash
 PATH  := $(GOPATH)/bin:$(PATH)
 
 OSFLAG 				:=
@@ -14,12 +14,17 @@ else
 	endif
 endif
 
-include config.base.env
+define strip_quotes
+$(shell echo $(1) | sed -e 's/^"//' -e 's/"$$//')
+endef
 
 # Import config
 # You can change the default config with `make config="config_special.env" build`
-config ?= config.minikube.env
+config ?= config.kind.env
 include $(config)
+
+include config.base.env
+$(foreach var,$(shell cat config.base.env),$(eval $(call strip_quotes,$(var))))
 
 # Set an output prefix, which is the local directory if not specified
 PREFIX?=$(shell pwd)
@@ -28,7 +33,7 @@ VERSION := $(shell cat VERSION.txt)
 GITCOMMIT := $(shell git rev-parse --short HEAD)
 GITBRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 GITUNTRACKEDCHANGES := $(shell git status --porcelain --untracked-files=no)
-GITIGNOREDBUTTRACKEDCHANGES := $(shell git ls-files -i --exclude-standard)
+GITIGNOREDBUTTRACKEDCHANGES := $(shell git ls-files -i -c --exclude-standard)
 ifneq ($(GITUNTRACKEDCHANGES),)
     GITCOMMIT := $(GITCOMMIT)-dirty
 endif
@@ -59,7 +64,7 @@ GO_LDFLAGS_STATIC=-ldflags "-w $(CTIMEVAR) -extldflags -static"
 GOOSARCHES = linux/amd64
 
 PACKAGES = $(shell go list -f '{{.ImportPath}}/' ./... | grep -v vendor)
-PACKAGES_FOR_UNIT_TESTS = $(shell go list -f '{{.ImportPath}}/' ./... | grep -v vendor | grep -v e2e | grep -v controllers)
+PACKAGES_FOR_UNIT_TESTS = $(shell go list -f '{{.ImportPath}}/' ./... | grep -v vendor | grep -v e2e | grep -v helm)
 
 # Run all the e2e tests by default
 E2E_TEST_SELECTOR ?= .*
@@ -71,6 +76,7 @@ OPERATOR_ARGS ?= --jenkins-api-hostname=$(JENKINS_API_HOSTNAME) --jenkins-api-po
 
 PLATFORM = $(shell echo $(UNAME_S) | tr A-Z a-z)
 CPUS_NUMBER = 3
+MEMORY_AMOUNT = 4096
 ##################### FROM OPERATOR SDK ########################
 
 # Default bundle image tag

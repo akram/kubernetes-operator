@@ -69,7 +69,7 @@ weight = 1
 # Everything below this are Site Params
 
 [params]
-copyright = "VirtusLab"
+copyright = "Jenkins Operator Community"
 #privacy_policy = "https://policies.google.com/privacy"
 
 # Menu title if your navbar has a versions selector to access old versions of your site.
@@ -90,7 +90,7 @@ gcs_engine_id = "011737558837375720776:fsdu1nryfng"
 # User interface configuration
 [params.ui]
 # Enable to show the side bar menu in its compact state.
-sidebar_menu_compact = false
+sidebar_menu_compact = true
 #  Set to true to disable breadcrumb navigation.
 breadcrumb_disable = false
 #  Set to true to hide the sidebar search box (the top nav search box will still be displayed if search is enabled)

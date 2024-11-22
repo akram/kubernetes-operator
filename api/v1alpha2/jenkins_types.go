@@ -14,9 +14,17 @@ type JenkinsSpec struct {
 	Master JenkinsMaster `json:"master"`
 
 	// SeedJobs defines list of Jenkins Seed Job configurations
-	// More info: https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/configuration#configure-seed-jobs-and-pipelines
+	// More info: https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/configuring-seed-jobs-and-pipelines/
 	// +optional
 	SeedJobs []SeedJob `json:"seedJobs,omitempty"`
+
+	// SeedJobAgentImage defines the image that will be used by the seed job agent. If not defined jenkins/inbound-agent:4.9-1 will be used.
+	// +optional
+	SeedJobAgentImage string `json:"seedJobAgentImage,omitempty"`
+
+	// ValidateSecurityWarnings enables or disables validating potential security warnings in Jenkins plugins via admission webhooks.
+	//+optional
+	ValidateSecurityWarnings bool `json:"validateSecurityWarnings,omitempty"`
 
 	// Notifications defines list of a services which are used to inform about Jenkins status
 	// Can be used to integrate chat services like Slack, Microsoft Teams or Mailgun
@@ -38,12 +46,12 @@ type JenkinsSpec struct {
 	SlaveService Service `json:"slaveService,omitempty"`
 
 	// Backup defines configuration of Jenkins backup
-	// More info: https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/configure-backup-and-restore/
+	// More info: https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/configuring-backup-and-restore/
 	// +optional
 	Backup Backup `json:"backup,omitempty"`
 
 	// Backup defines configuration of Jenkins backup restore
-	// More info: https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/configure-backup-and-restore/
+	// More info: https://jenkinsci.github.io/kubernetes-operator/docs/getting-started/latest/configuring-backup-and-restore/
 	// +optional
 	Restore Restore `json:"restore,omitempty"`
 
@@ -303,6 +311,7 @@ type JenkinsMaster struct {
 	//     periodSeconds: 10
 	//     successThreshold: 1
 	//     timeoutSeconds: 5
+	//   lifecycle: {}
 	//   name: jenkins-master
 	//   readinessProbe:
 	//     failureThreshold: 3
@@ -342,25 +351,31 @@ type JenkinsMaster struct {
 	// BasePlugins contains plugins required by operator
 	// +optional
 	// Defaults to :
-	// - name: kubernetes
-	// version: "1.28.6"
-	// - name: workflow-job
-	// version: "2.40"
-	// - name: workflow-aggregator
-	// version: "2.6"
-	// - name: git
-	// version: "4.5.0"
-	// - name: job-dsl
-	// version: "1.77"
 	// - name: configuration-as-code
-	// version: "1.46"
+	// version: "1625.v27444588cc3d"
+	// - name: git
+	// version: "5.0.0"
+	// - name: job-dsl
+	// version: "1.83"
+	// - name: kubernetes
+	// version: "3909.v1f2c633e8590"
 	// - name: kubernetes-credentials-provider
-	// version: "0.15"
+	// version: "1.211.vc236a_f5a_2f3c"
+	// - name: workflow-aggregator
+	// version: "596.v8c21c963d92d"
+	// - name: workflow-job
+	// version: "1289.vd1c337fd5354"
 	BasePlugins []Plugin `json:"basePlugins,omitempty"`
 
 	// Plugins contains plugins required by user
 	// +optional
 	Plugins []Plugin `json:"plugins,omitempty"`
+
+	// Allow to override jenkins-plugin-cli default behavior
+	// while downloading the plugin and dependencies
+	// see: https://github.com/jenkinsci/plugin-installation-manager-tool#cli-options
+	// +optional
+	LatestPlugins *bool `json:"latestPlugins,omitempty"`
 
 	// DisableCSRFProtection allows you to toggle CSRF Protection on Jenkins
 	DisableCSRFProtection bool `json:"disableCSRFProtection"`
@@ -368,6 +383,17 @@ type JenkinsMaster struct {
 	// PriorityClassName for Jenkins master pod
 	// +optional
 	PriorityClassName string `json:"priorityClassName,omitempty"`
+
+	// HostAliases for Jenkins master pod and SeedJob agent
+	// +optional
+	HostAliases []corev1.HostAlias `json:"hostAliases,omitempty"`
+
+	// The grace period is the duration in seconds after the processes running in the pod are sent
+	// a termination signal and the time when the processes are forcibly halted with a kill signal.
+	// Set this value longer than the expected cleanup time for your process.
+	// Defaults to 30 seconds.
+	// +optional
+	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty"`
 }
 
 // Service defines Kubernetes service attributes
@@ -519,6 +545,7 @@ const (
 	BasicSSHCredentialType JenkinsCredentialType = "basicSSHUserPrivateKey"
 	// UsernamePasswordCredentialType define username & password Jenkins credential type
 	UsernamePasswordCredentialType JenkinsCredentialType = "usernamePassword"
+	GithubAppCredentialType        JenkinsCredentialType = "githubApp"
 	// ExternalCredentialType defines other credential type
 	ExternalCredentialType JenkinsCredentialType = "external"
 )
@@ -528,6 +555,7 @@ var AllowedJenkinsCredentialMap = map[string]string{
 	string(NoJenkinsCredentialCredentialType): "",
 	string(BasicSSHCredentialType):            "",
 	string(UsernamePasswordCredentialType):    "",
+	string(GithubAppCredentialType):           "",
 	string(ExternalCredentialType):            "",
 }
 

@@ -89,10 +89,57 @@ test: ## Runs the go tests
 	@RUNNING_TESTS=1 go test -tags "$(BUILDTAGS) cgo" $(PACKAGES_FOR_UNIT_TESTS)
 
 .PHONY: e2e
-e2e: deepcopy-gen ## Runs e2e tests, you can use EXTRA_ARGS
+e2e: deepcopy-gen manifests backup-kind-load ## Runs e2e tests, you can use EXTRA_ARGS
 	@echo "+ $@"
-	RUNNING_TESTS=1 go test -parallel=1 "./test/e2e/" -tags "$(BUILDTAGS) cgo" -v -timeout 60m -run "$(E2E_TEST_SELECTOR)" \
+	RUNNING_TESTS=1 go test -parallel=1 "./test/e2e/" -ginkgo.v -tags "$(BUILDTAGS) cgo" -v -timeout 60m -run "$(E2E_TEST_SELECTOR)" \
 		-jenkins-api-hostname=$(JENKINS_API_HOSTNAME) -jenkins-api-port=$(JENKINS_API_PORT) -jenkins-api-use-nodeport=$(JENKINS_API_USE_NODEPORT) $(E2E_TEST_ARGS)
+
+## Backup Section
+
+.PHONY: backup-kind-load
+backup-kind-load: ## Load latest backup image in the cluster
+	@echo "+ $@"
+	make -C backup/pvc backup-kind-load
+
+## HELM Section
+
+.PHONY: helm
+HAS_HELM := $(shell command -v helm 2> /dev/null)
+helm: ## Download helm if it's not present, otherwise symlink
+	@echo "+ $@"
+ifeq ($(strip $(HAS_HELM)),)
+    mkdir -p $(PROJECT_DIR)/bin
+    curl -Lo $(PROJECT_DIR)/bin/helm.tar.gz https://get.helm.sh/helm-v$(HELM_VERSION)-$(PLATFORM)-amd64.tar.gz && tar xzfv $(PROJECT_DIR)/bin/helm.tar.gz -C $(PROJECT_DIR)/bin
+    mv $(PROJECT_DIR)/bin/$(PLATFORM)-amd64/helm $(PROJECT_DIR)/bin/helm
+    rm -rf $(PROJECT_DIR)/bin/$(PLATFORM)-amd64
+    rm -rf $(PROJECT_DIR)/bin/helm.tar.gz
+else
+	mkdir -p $(PROJECT_DIR)/bin
+	test -L $(PROJECT_DIR)/bin/helm || ln -sf $(shell command -v helm) $(PROJECT_DIR)/bin/helm
+endif
+
+.PHONY: helm-lint
+helm-lint: helm
+	bin/helm lint chart/jenkins-operator
+
+.PHONY: helm-release-latest
+helm-release-latest: helm
+	mkdir -p /tmp/jenkins-operator-charts
+	mv chart/jenkins-operator/*.tgz /tmp/jenkins-operator-charts
+	cd chart && ../bin/helm package jenkins-operator
+	mv chart/jenkins-operator-*.tgz chart/jenkins-operator/
+	bin/helm repo index chart/ --url https://raw.githubusercontent.com/jenkinsci/kubernetes-operator/master/chart/ --merge chart/index.yaml
+	mv /tmp/jenkins-operator-charts/*.tgz chart/jenkins-operator/
+
+.PHONY: helm-e2e
+IMAGE_NAME := quay.io/$(QUAY_ORGANIZATION)/$(QUAY_REGISTRY):$(GITCOMMIT)-amd64
+
+helm-e2e: helm container-runtime-build-amd64 backup-kind-load ## Runs helm e2e tests, you can use EXTRA_ARGS
+	kind load docker-image ${IMAGE_NAME} --name $(KIND_CLUSTER_NAME)
+	@echo "+ $@"
+	RUNNING_TESTS=1 go test -parallel=1 "./test/helm/" -ginkgo.v -tags "$(BUILDTAGS) cgo" -v -timeout 60m -run "$(E2E_TEST_SELECTOR)" -image-name=$(IMAGE_NAME) $(E2E_TEST_ARGS)
+
+## CODE CHECKS section
 
 .PHONY: vet
 vet: ## Verifies `go vet` passes
@@ -133,12 +180,25 @@ install: ## Installs the executable
 	@echo "+ $@"
 	go install -tags "$(BUILDTAGS)" ${GO_LDFLAGS} $(BUILD_PATH)
 
+.PHONY: update-lts-version
+update-lts-version: ## Update the latest lts version
+	@echo "+ $@"
+	echo $(LATEST_LTS_VERSION)
+	sed -i 's|jenkins/jenkins:[0-9]\+.[0-9]\+.[0-9]\+|jenkins/jenkins:$(LATEST_LTS_VERSION)|g' chart/jenkins-operator/values.yaml
+	sed -i 's|jenkins/jenkins:[0-9]\+.[0-9]\+.[0-9]\+|jenkins/jenkins:$(LATEST_LTS_VERSION)|g' test/e2e/test_utility.go
+	sed -i 's|jenkins/jenkins:[0-9]\+.[0-9]\+.[0-9]\+|jenkins/jenkins:$(LATEST_LTS_VERSION)|g' test/helm/helm_test.go
+	sed -i 's|jenkins/jenkins:[0-9]\+.[0-9]\+.[0-9]\+|jenkins/jenkins:$(LATEST_LTS_VERSION)|g' pkg/constants/constants.go
+	#TODO: source the version from config.base.env for bats test, no need of hardcoded version
+	sed -i 's|jenkins/jenkins:[0-9]\+.[0-9]\+.[0-9]\+|jenkins/jenkins:$(LATEST_LTS_VERSION)|g' test/bats/1-deploy.bats
+	sed -i 's|jenkins/jenkins:[0-9]\+.[0-9]\+.[0-9]\+|jenkins/jenkins:$(LATEST_LTS_VERSION)|g' test/bats/2-deploy-with-more-options.bats
+	sed -i 's|jenkins/jenkins:[0-9]\+.[0-9]\+.[0-9]\+|jenkins/jenkins:$(LATEST_LTS_VERSION)|g' test/bats/3-deploy-with-webhook.bats
+
 .PHONY: run
 run: export WATCH_NAMESPACE = $(NAMESPACE)
 run: export OPERATOR_NAME = $(NAME)
-run: fmt vet manifests install-crds build ## Run the executable, you can use EXTRA_ARGS
+run: fmt vet install-crds build ## Run the executable, you can use EXTRA_ARGS
 	@echo "+ $@"
-ifeq ($(KUBERNETES_PROVIDER),minikube)
+ifeq ($(KUBERNETES_PROVIDER),kind)
 	kubectl config use-context $(KUBECTL_CONTEXT)
 endif
 ifeq ($(KUBERNETES_PROVIDER),crc)
@@ -200,46 +260,66 @@ endif
 container-runtime-login: ## Log in into the Docker repository
 	@echo "+ $@"
 
-.PHONY: container-runtime-build
-container-runtime-build: check-env deepcopy-gen ## Build the container
+.PHONY: container-runtime-build-%
+container-runtime-build-%: ## Build the container
 	@echo "+ $@"
-	$(CONTAINER_RUNTIME_COMMAND) build \
-	--build-arg GO_VERSION=$(GO_VERSION) \
-	--build-arg CTIMEVAR="$(CTIMEVAR)" \
-	-t $(DOCKER_REGISTRY):$(GITCOMMIT) . \
-	--file Dockerfile $(CONTAINER_RUNTIME_EXTRA_ARGS)
+	$(CONTAINER_RUNTIME_COMMAND) buildx build \
+		--output=type=docker --platform linux/$* \
+		--build-arg GO_VERSION=$(GO_VERSION) \
+		--build-arg CTIMEVAR="$(CTIMEVAR)" \
+		--tag quay.io/$(QUAY_ORGANIZATION)/$(QUAY_REGISTRY):$(GITCOMMIT)-$* . \
+		--file Dockerfile $(CONTAINER_RUNTIME_EXTRA_ARGS)
+
+.PHONY: container-runtime-build
+container-runtime-build: check-env deepcopy-gen container-runtime-build-amd64 container-runtime-build-arm64
 
 .PHONY: container-runtime-images
 container-runtime-images: ## List all local containers
 	@echo "+ $@"
 	$(CONTAINER_RUNTIME_COMMAND) images $(CONTAINER_RUNTIME_EXTRA_ARGS)
 
+define buildx-create-command
+$(CONTAINER_RUNTIME_COMMAND) buildx create \
+	--driver=docker-container \
+	--use
+endef
+
+## Parameter is version
+define container-runtime-push-command
+$(CONTAINER_RUNTIME_COMMAND) buildx build \
+	--output=type=registry --platform linux/amd64,linux/arm64 \
+	--build-arg GO_VERSION=$(GO_VERSION) \
+	--build-arg CTIMEVAR="$(CTIMEVAR)" \
+	--tag quay.io/$(QUAY_ORGANIZATION)/$(QUAY_REGISTRY):$(1) . \
+	--file Dockerfile $(CONTAINER_RUNTIME_EXTRA_ARGS)
+endef
+
 .PHONY: container-runtime-push
-container-runtime-push: ## Push the container
+container-runtime-push: check-env deepcopy-gen ## Push the container
 	@echo "+ $@"
-	$(CONTAINER_RUNTIME_COMMAND) tag $(DOCKER_REGISTRY):$(GITCOMMIT) $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(BUILD_TAG) $(CONTAINER_RUNTIME_EXTRA_ARGS)
-	$(CONTAINER_RUNTIME_COMMAND) push $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(BUILD_TAG) $(CONTAINER_RUNTIME_EXTRA_ARGS)
+	$(call buildx-create-command)
+	$(call container-runtime-push-command,$(BUILD_TAG))
 
 .PHONY: container-runtime-snapshot-push
-container-runtime-snapshot-push:
+container-runtime-snapshot-push: check-env deepcopy-gen
 	@echo "+ $@"
-	$(CONTAINER_RUNTIME_COMMAND) tag $(DOCKER_REGISTRY):$(GITCOMMIT) $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(GITCOMMIT) $(CONTAINER_RUNTIME_EXTRA_ARGS)
-	$(CONTAINER_RUNTIME_COMMAND) push $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(GITCOMMIT) $(CONTAINER_RUNTIME_EXTRA_ARGS)
+	$(call buildx-create-command)
+	$(call container-runtime-push-command,$(GITCOMMIT))
 
 .PHONY: container-runtime-release-version
-container-runtime-release-version: ## Release image with version tag (in addition to build tag)
+container-runtime-release-version: check-env deepcopy-gen ## Release image with version tag (in addition to build tag)
 	@echo "+ $@"
-	$(CONTAINER_RUNTIME_COMMAND) tag $(DOCKER_REGISTRY):$(GITCOMMIT) $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(VERSION_TAG) $(CONTAINER_RUNTIME_EXTRA_ARGS)
-	$(CONTAINER_RUNTIME_COMMAND) push $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(VERSION_TAG) $(CONTAINER_RUNTIME_EXTRA_ARGS)
+	$(call buildx-create-command)
+	$(call container-runtime-push-command,$(VERSION_TAG))
 
 .PHONY: container-runtime-release-latest
-container-runtime-release-latest: ## Release image with latest tags (in addition to build tag)
+container-runtime-release-latest: check-env deepcopy-gen ## Release image with latest tags (in addition to build tag)
 	@echo "+ $@"
-	$(CONTAINER_RUNTIME_COMMAND) tag $(DOCKER_REGISTRY):$(GITCOMMIT) $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(LATEST_TAG) $(CONTAINER_RUNTIME_EXTRA_ARGS)
-	$(CONTAINER_RUNTIME_COMMAND) push $(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(LATEST_TAG) $(CONTAINER_RUNTIME_EXTRA_ARGS)
+	$(call buildx-create-command)
+	$(call container-runtime-push-command,$(LATEST_TAG))
 
 .PHONY: container-runtime-release
-container-runtime-release: container-runtime-build container-runtime-release-version container-runtime-release-latest ## Release image with version and latest tags (in addition to build tag)
+container-runtime-release: container-runtime-release-version container-runtime-release-latest ## Release image with version and latest tags (in addition to build tag)
 	@echo "+ $@"
 
 # if this session isn't interactive, then we don't want to allocate a
@@ -255,13 +335,7 @@ container-runtime-run: ## Run the container in docker, you can use EXTRA_ARGS
 	@echo "+ $@"
 	$(CONTAINER_RUNTIME_COMMAND) run $(CONTAINER_RUNTIME_EXTRA_ARGS) --rm -i $(DOCKER_FLAGS) \
 		--volume $(HOME)/.kube/config:/home/jenkins-operator/.kube/config \
-		$(DOCKER_REGISTRY):$(GITCOMMIT) /usr/bin/jenkins-operator $(OPERATOR_ARGS)
-
-.PHONY: minikube-run
-minikube-run: export WATCH_NAMESPACE = $(NAMESPACE)
-minikube-run: export OPERATOR_NAME = $(NAME)
-minikube-run: minikube-start run ## Run the operator locally and use minikube as Kubernetes cluster, you can use OPERATOR_ARGS
-	@echo "+ $@"
+		quay.io/${QUAY_ORGANIZATION}/$(QUAY_REGISTRY):$(GITCOMMIT) /usr/bin/jenkins-operator $(OPERATOR_ARGS)
 
 .PHONY: crc-run
 crc-run: export WATCH_NAMESPACE = $(NAMESPACE)
@@ -278,20 +352,12 @@ HAS_GEN_CRD_API_REFERENCE_DOCS := $(shell ls gen-crd-api-reference-docs 2> /dev/
 scheme-doc-gen: ## Generate Jenkins CRD scheme doc
 	@echo "+ $@"
 ifndef HAS_GEN_CRD_API_REFERENCE_DOCS
-	@wget https://github.com/ahmetb/$(GEN_CRD_API)/releases/download/v0.1.2/$(GEN_CRD_API)_linux_amd64.tar.gz
+	@wget https://github.com/ahmetb/$(GEN_CRD_API)/releases/download/v0.1.2/$(GEN_CRD_API)_$(PLATFORM)_amd64.tar.gz
 	@mkdir -p $(GEN_CRD_API)
-	@tar -C $(GEN_CRD_API) -zxf $(GEN_CRD_API)_linux_amd64.tar.gz
-	@rm $(GEN_CRD_API)_linux_amd64.tar.gz
+	@tar -C $(GEN_CRD_API) -zxf $(GEN_CRD_API)_$(PLATFORM)_amd64.tar.gz
+	@rm $(GEN_CRD_API)_$(PLATFORM)_amd64.tar.gz
 endif
 	$(GEN_CRD_API)/$(GEN_CRD_API) -config gen-crd-api-config.json -api-dir $(PKG)/api/$(API_VERSION) -template-dir $(GEN_CRD_API)/template -out-file documentation/$(VERSION)/jenkins-$(API_VERSION)-scheme.md
-
-.PHONY: check-minikube
-check-minikube: ## Checks if KUBERNETES_PROVIDER is set to minikube
-	@echo "+ $@"
-	@echo "KUBERNETES_PROVIDER '$(KUBERNETES_PROVIDER)'"
-ifneq ($(KUBERNETES_PROVIDER),minikube)
-	$(error KUBERNETES_PROVIDER not set to 'minikube')
-endif
 
 .PHONY: check-crc
 check-crc: ## Checks if KUBERNETES_PROVIDER is set to crc
@@ -301,21 +367,29 @@ ifneq ($(KUBERNETES_PROVIDER),crc)
 	$(error KUBERNETES_PROVIDER not set to 'crc')
 endif
 
-.PHONY: minikube
-HAS_MINIKUBE := $(shell which $(PROJECT_DIR)/bin/minikube)
-minikube: ## Download minikube if it's not present
+.PHONY: kind-setup
+kind-setup: ## Setup kind cluster
 	@echo "+ $@"
-ifndef HAS_MINIKUBE
-	mkdir -p $(PROJECT_DIR)/bin
-	wget -O $(PROJECT_DIR)/bin/minikube https://github.com/kubernetes/minikube/releases/download/v$(MINIKUBE_VERSION)/minikube-$(PLATFORM)-amd64
-	chmod +x $(PROJECT_DIR)/bin/minikube
-endif
+	kind create cluster --config kind-cluster.yaml --name $(KIND_CLUSTER_NAME)
 
-.PHONY: minikube-start
-minikube-start: minikube check-minikube ## Start minikube
+.PHONY: kind-clean
+kind-clean: ## Delete kind cluster
 	@echo "+ $@"
-	bin/minikube status && exit 0 || \
-	bin/minikube start --kubernetes-version $(MINIKUBE_KUBERNETES_VERSION) --dns-domain=$(CLUSTER_DOMAIN) --extra-config=kubelet.cluster-domain=$(CLUSTER_DOMAIN) --driver=$(MINIKUBE_DRIVER) --memory 4096 --cpus $(CPUS_NUMBER)
+	kind delete cluster --name $(KIND_CLUSTER_NAME)
+
+.PHONY: bats-tests
+IMAGE_NAME := quay.io/$(QUAY_ORGANIZATION)/$(QUAY_REGISTRY):$(GITCOMMIT)-amd64
+BUILD_PRESENT := $(shell docker images |grep -q ${IMAGE_NAME})
+ifndef BUILD_PRESENT
+bats-tests: backup-kind-load container-runtime-build-amd64 ## Run bats tests
+	@echo "+ $@"
+	kind load docker-image ${IMAGE_NAME} --name $(KIND_CLUSTER_NAME)
+	OPERATOR_IMAGE="${IMAGE_NAME}" TERM=xterm bats -T -p test/bats
+else
+bats-tests: backup-kind-load
+	@echo "+ $@"
+	OPERATOR_IMAGE="${IMAGE_NAME}" TERM=xterm bats -T -p test/bats
+endif
 
 .PHONY: crc-start
 crc-start: check-crc ## Start CodeReady Containers Kubernetes cluster
@@ -327,6 +401,7 @@ HAS_SEMBUMP := $(shell which $(PROJECT_DIR)/bin/sembump)
 sembump: # Download sembump locally if necessary
 	@echo "+ $@"
 ifndef HAS_SEMBUMP
+	mkdir -p $(PROJECT_DIR)/bin
 	wget -O $(PROJECT_DIR)/bin/sembump https://github.com/justintout/sembump/releases/download/v0.1.0/sembump-$(PLATFORM)-amd64
 	chmod +x $(PROJECT_DIR)/bin/sembump
 endif
@@ -339,21 +414,26 @@ bump-version: sembump ## Bump the version in the version file. Set BUMP to [ pat
 	@echo "Bumping VERSION.txt from $(VERSION) to $(NEW_VERSION)"
 	echo $(NEW_VERSION) > VERSION.txt
 	@echo "Updating version from $(VERSION) to $(NEW_VERSION) in README.md"
-	sed -i s/$(VERSION)/$(NEW_VERSION)/g README.md
-	sed -i s/$(VERSION)/$(NEW_VERSION)/g deploy/operator.yaml
-	sed -i s/$(VERSION)/$(NEW_VERSION)/g deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
-	cp deploy/service_account.yaml deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
-	cat deploy/role.yaml >> deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
-	cat deploy/role_binding.yaml >> deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
-	cat deploy/operator.yaml >> deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
-	git add VERSION.txt README.md deploy/operator.yaml deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
+	sed -i.bak 's/$(VERSION)/$(NEW_VERSION)/g' README.md
+	sed -i.bak 's/$(VERSION)/$(NEW_VERSION)/g' config/manager/manager.yaml
+	sed -i.bak 's/$(VERSION)/$(NEW_VERSION)/g' deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
+	rm */*/**.bak
+	rm */**.bak
+	rm *.bak
+	cp config/service_account.yaml deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
+	cat config/rbac/leader_election_role.yaml >> deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
+	cat config/rbac/leader_election_role_binding.yaml >> deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
+	cat config/rbac/role.yaml >> deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
+	cat config/rbac/role_binding.yaml >> deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
+	cat config/manager/manager.yaml >> deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
+	git add VERSION.txt README.md config/manager/manager.yaml deploy/$(ALL_IN_ONE_DEPLOY_FILE_PREFIX)-$(API_VERSION).yaml
 	git commit -vaem "Bump version to $(NEW_VERSION)"
 	@echo "Run make tag to create and push the tag for new version $(NEW_VERSION)"
 
 .PHONY: tag
 tag: ## Create a new git tag to prepare to build a release
 	@echo "+ $@"
-	git tag -s -a $(VERSION) -m "$(VERSION)"
+	git tag -a $(VERSION) -m "$(VERSION)"
 	git push origin $(VERSION)
 
 .PHONY: help
@@ -372,31 +452,17 @@ ifneq ($(GITUNTRACKEDCHANGES),)
 endif
 ifneq ($(GITIGNOREDBUTTRACKEDCHANGES),)
 	@echo "Ignored but tracked files:"
-	@git ls-files -i --exclude-standard
+	@git ls-files -i -c --exclude-standard
 	@echo
 endif
 	@echo "Dependencies:"
 	go mod vendor -v
 	@echo
 
-.PHONY: helm-package
-helm-package:
-	@echo "+ $@"
-	mkdir -p /tmp/jenkins-operator-charts
-	mv chart/jenkins-operator/*.tgz /tmp/jenkins-operator-charts
-	cd chart && helm package jenkins-operator
-	mv /tmp/jenkins-operator-charts/*.tgz chart/jenkins-operator/
-	rm -rf /tmp/jenkins-operator-charts/
-
-.PHONY: helm-deploy
-helm-deploy: helm-package
-	@echo "+ $@"
-	helm repo index chart/ --url https://raw.githubusercontent.com/jenkinsci/kubernetes-operator/master/chart/jenkins-operator/
-	cd chart/ && mv jenkins-operator-*.tgz jenkins-operator
 
 # Download and build hugo extended locally if necessary
 HUGO_PATH = $(shell pwd)/bin/hugo
-HUGO_VERSION = v0.62.2
+HUGO_VERSION = v0.99.1
 HAS_HUGO := $(shell $(HUGO_PATH)/hugo version 2>&- | grep $(HUGO_VERSION))
 hugo:
 ifeq ($(HAS_HUGO), )
@@ -413,16 +479,10 @@ generate-docs: hugo ## Re-generate docs directory from the website directory
 	cd website && npm install
 	$(HUGO_PATH)/hugo -s website -d ../docs
 
-.PHONY: all-in-one-build
-FILENAME := config/all_in_one_$(API_VERSION).yaml
-all-in-one-build: ## Re-generate all-in-one yaml
+.PHONY: run-docs
+run-docs: hugo
 	@echo "+ $@"
-	> $(FILENAME)
-	cat config/rbac/leader_election_role.yaml >> $(FILENAME)
-	cat config/rbac/leader_election_role_binding.yaml >> $(FILENAME)
-	cat config/rbac/role.yaml >> $(FILENAME)
-	cat config/rbac/role_binding.yaml >> $(FILENAME)
-	cat config/manager/manager.yaml >> $(FILENAME)
+	cd website && $(HUGO_PATH)/hugo server -D
 
 ##################### FROM OPERATOR SDK ########################
 # Install CRDs into a cluster
@@ -435,7 +495,7 @@ uninstall-crds: manifests kustomize
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests kustomize
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(DOCKER_REGISTRY):$(GITCOMMIT)
+	cd config/manager && $(KUSTOMIZE) edit set image controller=quay.io/$(QUAY_ORGANIZATION)/$(QUAY_REGISTRY):$(GITCOMMIT)
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 # UnDeploy controller from the configured Kubernetes cluster in ~/.kube/config
@@ -443,7 +503,7 @@ undeploy:
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests: controller-gen all-in-one-build
+manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Generate code
@@ -486,7 +546,7 @@ endif
 .PHONY: bundle
 bundle: manifests operator-sdk kustomize
 	bin/operator-sdk generate kustomize manifests -q
-	cd config/manager && $(KUSTOMIZE) edit set image controller=$(DOCKER_ORGANIZATION)/$(DOCKER_REGISTRY):$(VERSION_TAG)
+	cd config/manager && $(KUSTOMIZE) edit set image controller=quay.io/$(QUAY_ORGANIZATION)/$(QUAY_REGISTRY):$(VERSION_TAG)
 	$(KUSTOMIZE) build config/manifests | bin/operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
 	bin/operator-sdk bundle validate ./bundle
 
@@ -500,3 +560,15 @@ kubebuilder:
 	mkdir -p ${ENVTEST_ASSETS_DIR}
 	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.0/hack/setup-envtest.sh
 	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR);
+
+# install cert-manager v1.5.1
+install-cert-manager: kind-setup
+	kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.5.1/cert-manager.yaml
+
+uninstall-cert-manager: kind-setup
+	kubectl delete -f https://github.com/jetstack/cert-manager/releases/download/v1.5.1/cert-manager.yaml
+
+# Deploy the operator locally along with webhook using helm charts
+deploy-webhook: container-runtime-build-amd64
+	@echo "+ $@"
+	bin/helm upgrade jenkins chart/jenkins-operator --install --set-string operator.image=${IMAGE_NAME} --set webhook.enabled=true --set jenkins.enabled=false

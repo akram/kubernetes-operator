@@ -15,6 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const pvcName = "pvc-jenkins"
@@ -52,7 +53,7 @@ func createPVC(namespace string) {
 			Namespace: namespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 			Resources: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
 					corev1.ResourceStorage: resource.MustParse("1Gi"),
@@ -61,7 +62,7 @@ func createPVC(namespace string) {
 		},
 	}
 
-	Expect(k8sClient.Create(context.TODO(), pvc)).Should(Succeed())
+	Expect(K8sClient.Create(context.TODO(), pvc)).Should(Succeed())
 }
 
 func createJenkinsWithBackupAndRestoreConfigured(name, namespace string) *v1alpha2.Jenkins {
@@ -107,17 +108,56 @@ func createJenkinsWithBackupAndRestoreConfigured(name, namespace string) *v1alph
 			Master: v1alpha2.JenkinsMaster{
 				Containers: []v1alpha2.Container{
 					{
-						Name: resources.JenkinsMasterContainerName,
+						Name:  resources.JenkinsMasterContainerName,
+						Image: JenkinsTestImage,
 						VolumeMounts: []corev1.VolumeMount{
 							{
 								Name:      "plugins-cache",
 								MountPath: "/usr/share/jenkins/ref/plugins",
 							},
 						},
+						ReadinessProbe: &corev1.Probe{
+							Handler: corev1.Handler{
+								HTTPGet: &corev1.HTTPGetAction{
+									Path:   "/login",
+									Port:   intstr.FromString("http"),
+									Scheme: corev1.URISchemeHTTP,
+								},
+							},
+							InitialDelaySeconds: int32(100),
+							TimeoutSeconds:      int32(4),
+							FailureThreshold:    int32(30),
+							SuccessThreshold:    int32(1),
+							PeriodSeconds:       int32(5),
+						},
+						LivenessProbe: &corev1.Probe{
+							Handler: corev1.Handler{
+								HTTPGet: &corev1.HTTPGetAction{
+									Path:   "/login",
+									Port:   intstr.FromString("http"),
+									Scheme: corev1.URISchemeHTTP,
+								},
+							},
+							InitialDelaySeconds: int32(80),
+							TimeoutSeconds:      int32(4),
+							FailureThreshold:    int32(30),
+							SuccessThreshold:    int32(1),
+							PeriodSeconds:       int32(5),
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("250m"),
+								corev1.ResourceMemory: resource.MustParse("500Mi"),
+							},
+							Limits: corev1.ResourceList{
+								corev1.ResourceCPU:    resource.MustParse("1000m"),
+								corev1.ResourceMemory: resource.MustParse("3Gi"),
+							},
+						},
 					},
 					{
 						Name:            containerName,
-						Image:           "virtuslab/jenkins-operator-backup-pvc:v0.1.0",
+						Image:           "quay.io/jenkins-kubernetes-operator/backup-pvc:e2e-test",
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Env: []corev1.EnvVar{
 							{
@@ -170,8 +210,9 @@ func createJenkinsWithBackupAndRestoreConfigured(name, namespace string) *v1alph
 				},
 			},
 			Service: v1alpha2.Service{
-				Type: corev1.ServiceTypeNodePort,
-				Port: constants.DefaultHTTPPortInt32,
+				Type:     corev1.ServiceTypeNodePort,
+				Port:     constants.DefaultHTTPPortInt32,
+				NodePort: 30303,
 			},
 		},
 	}
@@ -180,7 +221,7 @@ func createJenkinsWithBackupAndRestoreConfigured(name, namespace string) *v1alph
 
 	_, _ = fmt.Fprintf(GinkgoWriter, "Jenkins CR %+v\n", *jenkins)
 
-	Expect(k8sClient.Create(context.TODO(), jenkins)).Should(Succeed())
+	Expect(K8sClient.Create(context.TODO(), jenkins)).Should(Succeed())
 
 	return jenkins
 }
@@ -190,5 +231,5 @@ func resetJenkinsStatus(jenkins *v1alpha2.Jenkins) {
 
 	jenkins = getJenkins(jenkins.Namespace, jenkins.Name)
 	jenkins.Status = v1alpha2.JenkinsStatus{}
-	Expect(k8sClient.Status().Update(context.TODO(), jenkins)).Should(Succeed())
+	Expect(K8sClient.Status().Update(context.TODO(), jenkins)).Should(Succeed())
 }
